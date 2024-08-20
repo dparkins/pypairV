@@ -99,19 +99,10 @@ fourpi=2.0*twopi
 veldisp=0.0
 # veldisp=300.0
 
-# This controls size of the table in growthq (number of steps in z).
-na=1000
-
 # This controls what angular separation (in radian) is small enough	
 # that we will regard the pair to refer to the same SN.
 dthetatol=pi/180./60./60.
 
-# This controls size of table for Pifunc and Sigfunc (used if imethod=2)
-nPStab=500
-# This controls the minimum and maximum r's in the table, in Mpc (no h's).
-# Should choose rPSmin to be fairly small, because I will approximate ar=0 with it.
-rPSmin=0.1
-rPSmax=1.0
 # Set the following to 1 if want to read Pifunc and Sigfunc from an existing table
 # (see comments in subroutine initpairVV). Otherwise set to 0.
 ireadPiSigtable=0
@@ -136,7 +127,7 @@ iwritePiSigtable=1
 # for a large number of pairs.
 #
 # dtheta is in radians.
-def pairVV(RA1, DEC1, z1, RA2, DEC2, z2,cosmo,power,imethod):
+def pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo,power,imethod):
 	Cvfacsave = 0.0  # Initialize Cvfacsave
 	veldisptol = 1.0e-3
 	dztol = 1.0e-8
@@ -178,15 +169,15 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2,cosmo,power,imethod):
 		if ipair == 1:
 			out = initializePower(cosmo,power)
 
-		fac1, Dprimeoverc1, chi1 = cosmocompute(z1,cosmo)
-		fac2, Dprimeoverc2, chi2 = cosmocompute(z2,cosmo)
+		fac1, Dprimeoverc1, chi1 = cosmocompute(z1,cosmo,power)
+		fac2, Dprimeoverc2, chi2 = cosmocompute(z2,cosmo,power)
 
 		if power.ipvelLINEAR != 1:
 			if ipair == 1:
 				out = pNLini(0.0)
 
 		if ipair == 1:
-			Pifunctab, Sigfunctab, rtab = initpairVV(nPStab,rPSmin,rPSmax,power)
+			initpairVV(cosmo,power)
 
 		angr1, angr2, rsep = angsep2(dtheta, chi1, chi2,cosmo)
 
@@ -198,7 +189,7 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2,cosmo,power,imethod):
 
 
 
-		Pifunc, Sigfunc = PiSig(Pifunctab, Sigfunctab, rtab,rsep,rPSmin,rPSmax)
+		Pifunc, Sigfunc = PiSig(power,rsep)
 		Cvfac = np.cos(angr1) * np.cos(angr2) * Pifunc + (np.cos(dtheta) - np.cos(angr1) * np.cos(angr2)) * Sigfunc
 		Cv = (5.0 / np.log(10.0))**2 * fac1 * fac2 * Dprimeoverc1 * Dprimeoverc2 * Cvfac
 		xiV = Dprimeoverc1 * Dprimeoverc2 * Cvfac * cspeed**2
@@ -226,27 +217,27 @@ def angsep(ra1, dec1, ra2, dec2):
 
 	if cosSep > 1.0:
 		print('warning cosSep greater than 1', cosSep)
-	cosSep = 1.0
+		cosSep = 1.0
 
 	dtheta = np.arccos(cosSep)
 	dthetaEucl = np.sqrt((alpha1 - alpha2) ** 2 + (theta1 - theta2) ** 2)
 
-	return dtheta, dthetaEucl
+	return dtheta
 
 
 # This outputs fac, Dprimeoverc, chi for an input redshift z.
 # fac = (1 - (a/a')*c/chi)  where a' = da/deta, eta=conformal time
 # Dprimeoverc = D'/c in [Mpc]^{-1}, where D is the growth factor
 # chi = radial comoving distance in Mpc (no factor of h).
-def cosmocompute(z,cosmo):
+def cosmocompute(z,cosmo,power):
 	dfact = 1.001
 
 	chi = chiRQ(z, cosmo)
 
 	hz = HzzQ(z, cosmo)
 
-	Dgrow = Tgrowthfac(z, cosmo)
-	Dgrow2 = Tgrowthfac(z * dfact, cosmo)
+	Dgrow = Tgrowthfac(z, cosmo,power)
+	Dgrow2 = Tgrowthfac(z * dfact, cosmo,power)
 
 	dDgrowdz = (Dgrow2 - Dgrow) / z / (dfact - 1.0)
 
@@ -387,7 +378,7 @@ def angsep2(dtheta, chi1, chi2,cosmo):
 	omegakItol = 1.0e-8
 	aminus1tol = 1.0e-8
 
-	if abs(cosmo.omegak) > omegakItol:
+	if abs(cosmo.omegakI) > omegakItol:
 		print('Need to modify code for nonflat univ')
 		raise SystemExit
 
@@ -400,6 +391,7 @@ def angsep2(dtheta, chi1, chi2,cosmo):
 		raise SystemExit
 
 	rsep2 = chi1**2 + chi2**2 - 2.0 * chi1 * chi2 * np.cos(dtheta)
+
 	if rsep2 < (rseptol * chimin)**2:
 		rsep = 0.0
 		angr1 = np.pi / 2.0
@@ -429,7 +421,7 @@ def angsep2(dtheta, chi1, chi2,cosmo):
 	return angr1, angr2, rsep
 
 
-def initpairVV(nPStab,rPSmin,rPSmax,power):
+def initpairVV(cosmo,power):
 	'''This outputs a table of Pifunc(r) and Sigfunc(r), defined in Eq. 10 of Hui & Frieman
 	(but without the factors of D').
 	Pifunc(r) = \int (dk/2pi^2) P(k,z=0) [ j_0(kr) - 2j_1(kr)/(kr) ]
@@ -439,101 +431,99 @@ def initpairVV(nPStab,rPSmin,rPSmax,power):
 	j_1 (x) / x = 1/3 in the x --> limit.
 	i.e. j_0 = (sin x)/x, j_1 = (sin x)/x^2 - (cos x)/x'''
 	import scipy.special as sp
-	Pifunctab = np.zeros(nPStab)
-	Sigfunctab = np.zeros(nPStab)
-	rtab = np.zeros(nPStab)
+	
 
 	if ireadPiSigtable == 0:
 		# This means we need to compute the table anew.
-		dlnr = np.log(rPSmax / rPSmin) / (nPStab - 1)
+		dlnr = np.log(power.rPSmax / power.rPSmin) / (power.nPStab - 1)
 
-		for i in range(nPStab):
-			rtab[i] = rPSmin * np.exp(dlnr * i)
+		for i in range(power.nPStab):
+			power.rtab[i] = power.rPSmin * np.exp(dlnr * i)
 
-			akeffmax = 1.0 / rtab[i]
+			akeffmax = 1.0 / power.rtab[i]
 			if akeffmax < power.akeffmaxmax:
 				akeffmax = power.akeffmaxmax
 			
-			akplotmax = akeffmax * aklargeangfact2
+			akplotmax = akeffmax * power.aklargeangfact2
 			if akplotmax > power.akplotmaxP:
 				akplotmax = power.akplotmaxP
 
 			akplotmin = power.akplotminP
 
-			dlkp = np.log(akplotmax / akplotmin) / (nplot - 1)
+			dlkp = np.log(akplotmax / akplotmin) / (power.nplot - 1)
 
 			sumPi = 0.0
 			sumSig = 0.0
 
-			for int in range(1, nplot):
+			for int in range(1, power.nplot):
 				ak = akplotmin * np.exp(dlkp * int)
 
 				if power.ipvelLINEAR == 1:
-					puse = poutLINEARnoh(ak, 0.0)
+					puse = poutLINEARnoh(ak, 0.0, cosmo, power)
 				else:
-					puse = poutNONLINEARnoh(ak, 0.0)
+					puse = poutNONLINEARnoh(ak, 0.0, cosmo, power)
 
-				x = ak * rtab[i]
-				sj0, sjp0 = sp.spherical_jn(0, x)
-				sj1, sjp1 = sp.spherical_jn(1, x)
+				x = ak * power.rtab[i]
+				sj0 = sp.spherical_jn(0, x)
+				sj1 = sp.spherical_jn(1, x)
 
 				sumPi += ak * puse * (sj0 - 2.0 * sj1 / x)
 				sumSig += ak * puse * sj1 / x
 
-			Pifunctab[i] = sumPi / (2.0 * np.pi * np.pi) * dlkp
-			Sigfunctab[i] = sumSig / (2.0 * np.pi * np.pi) * dlkp
+			power.Pifunctab[i] = sumPi / (2.0 * np.pi * np.pi) * dlkp
+			power.Sigfunctab[i] = sumSig / (2.0 * np.pi * np.pi) * dlkp
 
 	# This means we can just read Pifunc, Sigfunc, ar from an existing table
 	elif ireadPiSigtable == 1:
 		with open('PiSigtab', 'r') as f:
-			for i in range(nPStab):
-				Pifunctab[i], Sigfunctab[i], rtab[i] = map(float, f.readline().split())
+			for i in range(power.nPStab):
+				power.Pifunctab[i], power.Sigfunctab[i], power.rtab[i] = map(float, f.readline().split())
 
 	if ireadPiSigtable == 0 and iwritePiSigtable == 1:
 		with open('PiSigtab', 'w') as f:
-			for i in range(nPStab):
-				f.write(f"{Pifunctab[i]} {Sigfunctab[i]} {rtab[i]}\n")
+			for i in range(power.nPStab):
+				f.write(f"{power.Pifunctab[i]} {power.Sigfunctab[i]} {power.rtab[i]}\n")
 
-	return Pifunctab, Sigfunctab, rtab
+	return
 
 #------------------------------------------------------------------
 # 
-def PiSig(Pifunctab, Sigfunctab, rtab, ar, rPSmin, rPSmax):
+def PiSig(power, ar):
 	"""This outputs Pifunc, Sigfunc given input ar (in Mpc, no h's).
 	Pifunc and Sigfunc are defined in initpairVV, and are in Mpc^2."""
-	if ar > rPSmax:
-		print('need to increase rPSmax', ar, rPSmax)
+	if ar > power.rPSmax:
+		print('need to increase rPSmax', ar, power.rPSmax)
 		raise ValueError("rPSmax too small")
 
 # Will treat any such ar as if ar~rPSmin.
 
-	if ar <= rPSmin:
-		Pifunc = Pifunctab[0]
-		Sigfunc = Sigfunctab[0]
+	if ar <= power.rPSmin:
+		Pifunc = power.Pifunctab[0]
+		Sigfunc = power.Sigfunctab[0]
 		return Pifunc, Sigfunc
 
 
-	itry = int(np.log(ar / rPSmin) / (np.log(rPSmax / rPSmin) / (len(Pifunctab) - 1))) - 3
+	itry = int(np.log(ar / power.rPSmin) / (np.log(power.rPSmax / power.rPSmin) / (len(power.Pifunctab) - 1))) - 3
 
 	if itry < 1:
 		itry = 1
 
 	iOK = 0
-	for i in range(itry, len(Pifunctab) - 1):
-		if rtab[i] < ar <= rtab[i + 1]:
-			wL = np.log(ar) - np.log(rtab[i])
-			wR = np.log(rtab[i + 1]) - np.log(ar)
-			wT = np.log(rtab[i + 1] / rtab[i])
-			Pifunc = Pifunctab[i] * wR + Pifunctab[i + 1] * wL
+	for i in range(itry, len(power.Pifunctab) - 1):
+		if power.rtab[i] < ar <= power.rtab[i + 1]:
+			wL = np.log(ar) - np.log(power.rtab[i])
+			wR = np.log(power.rtab[i + 1]) - np.log(ar)
+			wT = np.log(power.rtab[i + 1] / power.rtab[i])
+			Pifunc = power.Pifunctab[i] * wR + power.Pifunctab[i + 1] * wL
 			Pifunc /= wT
-			Sigfunc = Sigfunctab[i] * wR + Sigfunctab[i + 1] * wL
+			Sigfunc = power.Sigfunctab[i] * wR + power.Sigfunctab[i + 1] * wL
 			Sigfunc /= wT
 			iOK = 1
-			return Pifunc, Sigfunc, rtab
+			return Pifunc, Sigfunc
 
 	if iOK == 0:
 		print('cannot locate ar in table')
-		print(ar, rtab[0], rtab[-1])
+		print(ar, power.rtab[0], power.rtab[-1])
 		raise ValueError("ar not found in rtab")
 
 	return Pifunc, Sigfunc
@@ -558,7 +548,7 @@ if __name__ == "__main__":
 		DEC2 = float(input('input DEC for SN 2: '))
 		z2 = float(input('input z for SN 2: '))
 		ipair = 1
-		Cv, dtheta, xiV = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,cosmo_fid,power_fid,imethod)
+		Cv, dtheta, xiV = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo_fid,power_fid,imethod)
 		print('Cv and dtheta are', Cv, dtheta * 180.0 / pi)
 		print('xiV is', xiV)
 
@@ -600,7 +590,7 @@ if __name__ == "__main__":
 					RA2 = RA[j]
 					DEC2 = DEC[j]
 					z2 = z[j]
-					Cv, dtheta, xiV = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,cosmo_fid,power_fid,imethod)
+					Cv, dtheta, xiV = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo_fid,power_fid,imethod)
 
 					f3.write(f"{Cv:.8e} {dtheta * 180.0 / pi:.8e} {SNname[i]} {RA[i]} {DEC[i]} {z[i]} {SNname[j]} {RA[j]} {DEC[j]} {z[j]} {i + 1} {j + 1} {xiV:.8e}\n")
 					print(Cv, i + 1, j + 1)
@@ -623,28 +613,28 @@ if __name__ == "__main__":
 			zinputmax = float(input('input maximum redshift: '))
 			dzout = (zinputmax - zinput) / float(itotal - 1)
 
-	with open('Cv.output', 'w') as f3:
-		ipair = 0
-		for i in range(itotal):
-			if ifix == 1:
-				z1 = zinput
-				z2 = zinput
-				DEC1 = 0.0
-				DEC2 = DEC1
-				RA1 = 0.0
-				RA2 = RA1 + dRA * (i)
-			elif ifix == 2:
-				z1 = zinput
-				z2 = z1 + dzout * (i)
-				DEC1 = 0.0
-				DEC2 = DEC1
-				RA1 = 0.0
-				RA2 = RA1 + angleinput
+		with open('Cv.output', 'w') as f3:
+			ipair = 0
+			for i in range(itotal):
+				if ifix == 1:
+					z1 = zinput
+					z2 = zinput
+					DEC1 = 0.0
+					DEC2 = DEC1
+					RA1 = 0.0
+					RA2 = RA1 + dRA * (i)
+				elif ifix == 2:
+					z1 = zinput
+					z2 = z1 + dzout * (i)
+					DEC1 = 0.0
+					DEC2 = DEC1
+					RA1 = 0.0
+					RA2 = RA1 + angleinput
 
-			ipair += 1
-			Cv, dtheta, xiV = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,cosmo_fid,power_fid,imethod)
+				ipair += 1
+				Cv, dtheta, xiV = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo_fid,power_fid,imethod)
 
-			f3.write(f"{Cv} {dtheta * 180.0 / pi} {z2} {xiV}\n")
+				f3.write(f"{Cv} {dtheta * 180.0 / pi} {z2} {xiV}\n")
 
-		f3.close()
+			f3.close()
 

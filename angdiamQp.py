@@ -1,3 +1,6 @@
+import numpy as np
+import scipy.integrate as sp
+
 # This is based on angdiamQ.f, which assumed wQ=constant.
 # Here, I want to allow for a time-varying wQ.
 # What does that mean?
@@ -39,20 +42,20 @@ from init import cosmo_params
 def HzzQ(z,cosmo):
     '''gives Hubble constant at z'''
 
-    h00 = 100.0 * cosmo.h
+    h00 = 100.0 * cosmo.hI
 
-    if abs(cosmo.omegam + cosmo.omegak + cosmo.omegav + cosmo.omegaQ - 1) > 1.0e-10:
+    if abs(cosmo.omegamI + cosmo.omegakI + cosmo.omegavI + cosmo.omegaQI - 1) > 1.0e-10:
         print('Omegas do not sum to one')
         print('error in HzzQ')
-        print(cosmo.omegam + cosmo.omegak + cosmo.omegav + cosmo.omegaQ)
+        print(cosmo.omegamI + cosmo.omegakI + cosmo.omegavI + cosmo.omegaQI)
         raise SystemExit
 
-    if cosmo.iwmode == 1:
-        hz = h00 * np.sqrt(cosmo.omegam * (1.0 + z)**3 + cosmo.omegak * (1.0 + z)**2 +cosmo.omegav + cosmo.omegaQ * (1.0 + z)**(3.0 * (1.0 + cosmo.wQ)))
-    elif cosmo.iwmode == 2:
-        hz = h00 * np.sqrt(omegam * (1.0 + z)**3 + cosmo.omegak * (1.0 + z)**2 +omegav + omegaQ * ((1.0 + z)**(3.0 * (1.0 + cosmo.wQ - cosmo.wQp)) *np.exp(3.0 *cosmo.wQp * z)))
-    elif cosmo.iwmode == 3:
-        hz = h00 * np.sqrt(cosmo.omegam * (1.0 + z)**3 + cosmo.omegak * (1.0 + z)**2 +cosmo.omegav + cosmo.omegaQ * ((1.0 + z)**(3.0 * (1.0 + cosmo.wQ + cosmo.wQp)) *np.exp(-3.0 * cosmo.wQp * z / (1.0 + z))))
+    if cosmo.iwmodeI == 1:
+        hz = h00 * np.sqrt(cosmo.omegamI * (1.0 + z)**3 + cosmo.omegakI * (1.0 + z)**2 +cosmo.omegavI + cosmo.omegaQI * (1.0 + z)**(3.0 * (1.0 + cosmo.wQI)))
+    elif cosmo.iwmodeI == 2:
+        hz = h00 * np.sqrt(cosmo.omegamI * (1.0 + z)**3 + cosmo.omegakI * (1.0 + z)**2 +cosmo.omegavI + cosmo.omegaQI * ((1.0 + z)**(3.0 * (1.0 + cosmo.wQI - cosmo.wQpI)) *np.exp(3.0 *cosmo.wQpI * z)))
+    elif cosmo.iwmodeI == 3:
+        hz = h00 * np.sqrt(cosmo.omegamI * (1.0 + z)**3 + cosmo.omegakI * (1.0 + z)**2 +cosmo.omegavI + cosmo.omegaQI * ((1.0 + z)**(3.0 * (1.0 + cosmo.wQI + cosmo.wQpI)) *np.exp(-3.0 * cosmo.wQpI * z / (1.0 + z))))
 
 
     return hz
@@ -67,11 +70,26 @@ def chiRQ(z,cosmo):
     chi in unit of Mpc, if want h^-1 Mpc, then
     take chi and multiply by h.'''
 
-    if abs(cosmo.omegam + cosmo.omegak + cosmo.omegav + cosmo.omegaQ - 1) > 1.0e-10:
+    if abs(cosmo.omegamI + cosmo.omegakI + cosmo.omegavI + cosmo.omegaQI - 1) > 1.0e-10:
         print('Omegas do not sum to one')
         print('error in chiRQ')
-        print(cosmo.omegam + cosmo.omegak + cosmo.omegav + cosmo.omegaQ)
+        print(cosmo.omegamI + cosmo.omegakI + cosmo.omegavI + cosmo.omegaQI)
         raise SystemExit
     
+    xstart = 0.
+    xend = z
+    chi, err = sp.quad(derivsQ,xstart,xend,args=(cosmo))
+
+    chi *= 2.99792458e5
 
     return chi
+
+
+def derivsQ(z,cosmo):
+    '''function to integrate under to get chi'''
+
+    hz = HzzQ(z,cosmo)
+
+    derivsQ = 1./hz
+
+    return derivsQ

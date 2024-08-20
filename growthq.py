@@ -1,99 +1,115 @@
 import numpy as np
+import scipy.integrate as sp
 
 
-def growthini(power):
+def growthini(cosmo,power):
     '''this program computes the growth factor for a quintessence universe
     '''
     # Constants and parameters
-    neq = 1
-    na = 1000
+    power.num_growth = 1000
     zmin = 0.0
     zmax = power.zmaxact  # Assuming zmaxact is defined elsewhere
 
     amax = 1.0 / (1.0 + zmin)
     amin = 1.0 / (1.0 + zmax)
-    da = (amax - amin) / (na - 1)
+    da = (amax - amin) / (power.num_growth - 1)
 
     # Initialize arrays
-    y = np.zeros(neq)
-    c = np.zeros(24)
-    work = np.zeros((neq, 9))
-    tol = 1.0e-12
-    g = np.zeros(na)
-    fg = np.zeros(na)
-    zaa = np.zeros(na)
+    g = np.zeros(power.num_growth)
+    power.f_growth = np.zeros(power.num_growth)
+    power.z_growth = np.zeros(power.num_growth)
 
+    print(cosmo.omegamI,cosmo.omegakI, cosmo.omegavI, cosmo.omegaQI)
     # Open file for writing
     with open('growthq.dat', 'w') as f:
-        for i in range(1, na + 1):
-            aa = amin + da * (i - 1)
+        for i in range(power.num_growth):
+            aend = amin + da * np.float64(i)
 
             astart = 0.0001
-            aend = aa
 
-            ier = 0
-            ind = 1
-            y[0] = astart
+            ln_a_init = np.log(astart)
+            ln_a_final = np.log(aend)
+            ln_delta, err = sp.quad(growthfacQ,ln_a_init,ln_a_final,args=(cosmo))
+            delta = np.exp(ln_delta)
+            g[i] = delta
+            if i == power.num_growth-1:
+                g0= delta
 
-            # Call to dverk function (assumed to be defined elsewhere)
-            ind, ier = dverk(neq, deriv, astart, y, aend, tol, ind, c, neq, work)
+       
+        for i in range(power.num_growth):
+            power.f_growth[i] = g[power.num_growth - (i+1)]
 
-            if ind < 0 or ier > 0:
-                print(f'dverk error, ind, ier= {ind}, {ier}')
-
-            g[i - 1] = y[0]
-
-            if i == na:
-                g0 = y[0]
-
-        for i in range(1, na + 1):
-            fg[i - 1] = g[na - i]
-
-        for i in range(1, na + 1):
-            aa = amax - da * (i - 1)
+        for i in range(power.num_growth):
+            aa = amax - da * np.float64(i)
             z = 1.0 / aa - 1.0
-            g[i - 1] = fg[i - 1]
-            fg[i - 1] = g[i - 1] / aa
-            zaa[i - 1] = z
-            f.write(f"{z} {g[i - 1] / aa} {g[i - 1] / g0}\n")
+            g[i] = power.f_growth[i]
+            power.f_growth[i] = g[i] / (aa/astart)
+            power.z_growth[i] = z
+            f.write(f"{z} {g[i] / (aa/astart)} {g[i] / g0}\n")
+            # second column is what PD called g(omega)
+            # and third column is the growth factor normalized
+            # to 1 at z=0
+
+
 
     # End of the program
 
 
     return
 
-def fgQQ(z,growth_data):
+def deriv(n, x, y,cosmo):
+    dydx = np.zeros(n)
+    dydx[0] = growthfacQ(x,cosmo) * y[0] / x
+    return dydx
+
+def growthfacQ(ln_a,cosmo):
+    if abs(cosmo.wQpI) > 1.0e-12:
+        print('this code does not work for nonzero wp')
+        raise SystemExit
+
+    a = np.exp(ln_a)
+    alpha = (3.0 / (5.0 - cosmo.wQI / (1.0 - cosmo.wQI)) + 
+             3.0 / 125.0 * (1.0 - cosmo.wQI) * (1.0 - 3.0 * cosmo.wQI / 2.0) / 
+             (1.0 - 6.0 * cosmo.wQI / 5.0)**3 * (1.0 - cosmo.omegamI))
+    
+    return omegamAA(a,cosmo) ** alpha
+
+def omegamAA(a,cosmo):
+    return cosmo.omegamI / (cosmo.omegamI + cosmo.omegakI * a + cosmo.omegavI * a**3 + cosmo.omegaQI / a**(3.0 * cosmo.wQI))
+
+
+
+def fgQQ(z,power):
     '''interpolate over range of growth values'''
     zatol = 1.0e-10
     iok = 0
 
-    na = len(growth_data.zaa)
 
-    for i in range(na - 1):
-        if z >= zaa[i] and z <= zaa[i + 1]:
-            if (zaa[i + 1] - zaa[i]) > zatol:
-                wL = (z - zaa[i]) / (zaa[i + 1] - zaa[i])
-                wR = (zaa[i + 1] - z) / (zaa[i + 1] - zaa[i])
+    for i in range(power.num_growth):
+        if z >= power.z_growth[i] and z <= power.z_growth[i + 1]:
+            if (power.z_growth[i + 1] - power.z_growth[i]) > zatol:
+                wL = (z - power.z_growth[i]) / (power.z_growth[i + 1] - power.z_growth[i])
+                wR = (power.z_growth[i + 1] - z) / (power.z_growth[i + 1] - power.z_growth[i])
             else:
                 wL = 0.0
                 wR = 1.0
-            fgQQ_value = fg[i] * wR + fg[i + 1] * wL
+            fgQQ_value = power.f_growth[i] * wR + power.f_growth[i + 1] * wL
             iok = 1
             break
 
-    if abs(z - zaa[na - 1]) < 1.0e-5:
-        fgQQ_value = fg[na - 1]
+    if abs(z - power.z_growth[power.num_growth - 1]) < 1.0e-5:
+        fgQQ_value = power.f_growth[power.num_growth - 1]
         iok = 1
 
     if iok == 0:
         print('z outside range of power table')
         print('z asked for', z)
-        print('largest table z', zaa[na - 1])
-        print('smallest table z', zaa[0])
-        if z < zaa[0]:
-            fgQQ_value = fg[0]
-        elif z > zaa[na - 1]:
-            fgQQ_value = fg[na - 1]
+        print('largest table z', power.z_growth[na - 1])
+        print('smallest table z', power.z_growth[0])
+        if z < power.z_growth[0]:
+            fgQQ_value = power.f_growth[0]
+        elif z > power.z_growth[power.num_growth - 1]:
+            fgQQ_value = power.f_growth[power.num_growth - 1]
 
     return fgQQ_value
 

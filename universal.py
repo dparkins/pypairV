@@ -1,5 +1,5 @@
 import numpy as np
-from init import cosmo_params
+from init import cosmo_params, power_params
 from growthq import fgQQ
 
 def phiPD(x,aneff,cosmo):
@@ -18,7 +18,7 @@ def phiPD(x,aneff,cosmo):
 
       return phiPD
 
-def growthfac(z,cosmo):
+def growthfac(z,cosmo,power):
       '''this gives an approximate growth factor (from Carroll et al. 
       ann. rev. of A. and A. 1992)
       put z to 0 to get what people call g (omega)
@@ -38,14 +38,14 @@ def growthfac(z,cosmo):
             omegavAA=AA3*cosmo.omegav/(AA+cosmo.omegam*(1.0-AA)+cosmo.omegav*(AA3-AA))
             growthfac=2.5/(1.0+z)*omegamAA/(omegamAA**(4.0/7.0)-omegavAA+(1.0+omegamAA/2.0)*(1.0+omegavAA/70.))
       else:
-            growthfac=fgQQ(z)/(1.+z)
+            growthfac=fgQQ(z,power)/(1.+z)
 
       return growthfac
 
 
-def Tgrowthfac(z,cosmo):
+def Tgrowthfac(z,cosmo,power):
 
-      Tgrowthfac=growthfac(z,cosmo)/growthfac(0.,cosmo)
+      Tgrowthfac=growthfac(z,cosmo,power)/growthfac(0.,cosmo,power)
 
       return Tgrowthfac
 

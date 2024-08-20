@@ -67,6 +67,8 @@ class power_params(object):
 		#This controls the number of k bins I used to compute the integrals over P(k).
 		self.nplot=1000
 		# This controls limits of integration for integral over P(k).
+		self.akrpass=np.zeros(self.nplot)
+		self.prpass=np.zeros(self.nplot)
 		self.akplotmaxP=1.0e6
 		self.akplotminP=1.0e-8
 		# This should be k roughly where k*P(k) peaks. 
@@ -80,5 +82,30 @@ class power_params(object):
 		self.aklargeangfact=25.0
 		# This controls limit of k integration over P(k) for imethod=2
 		self.aklargeangfact2=100.
+		#growth parameters
+		self.num_growth = 100
+		self.z_growth = np.zeros(self.num_growth)
+		# Pifunc and Sigfunc parameters
+		# This controls size of table for Pifunc and Sigfunc (used if imethod=2)
+		self.nPStab = 500
+		self.Pifunctab = np.zeros(self.nPStab)
+		self.Sigfunctab = np.zeros(self.nPStab)
+		self.rtab = np.zeros(self.nPStab)
+		# This controls the minimum and maximum r's in the table, in Mpc (no h's).
+		# Should choose rPSmin to be fairly small, because I will approximate ar=0 with it.
+		self.rPSmin=0.1
+		self.rPSmax=1.e+4	
+        # parameters holding the coefficients for the Eisenstein and Hu's transfer function
+		self.keqEH = 0. # equality k
+		self.sEH = 0. # exponent
+		self.alphacEH = 0. # alpha associated with CDM
+		self.betacEH  = 0. # beta associated with CDM
+		self.betanodeEH  = 0. # beta with the node
+		self.alphabEH  = 0. # alpha associated with baryons
+		self.betabEH  =  0. # beta associated with baryons
+		self.ksilkEH  =  0. # silk damping scale
+		self.fracBEH  =  0. # baryon fraction
+		self.fracCEH  =  1. # CDM fraction
+
 
 

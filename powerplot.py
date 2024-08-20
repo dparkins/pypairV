@@ -1,27 +1,11 @@
 import numpy as np
+import scipy.integrate as sp
 from init import cosmo_params,power_params
 from universal import Tgrowthfac
 from growthq import fgQQ, growthini
 
 # Constants
 twopi3 = 2 * np.pi**3
-
-class TransferEH_params(object):
-    '''A class for holding the coefficients for the Eisenstein and Hu's transfer function '''
-    def __init__(self, label):
-        self.label = label
-        self.keqEH = 0. # equality k
-        self.sEH = 0. # exponent
-        self.alphacEH = 0. # alpha associated with CDM
-        self.betacEH  = 0. # beta associated with CDM
-        self.betanodeEH  = 0. # beta with the node
-        self.alphabEH  = 0. # alpha associated with baryons
-        self.betabEH  =  0. # beta associated with baryons
-        self.ksilkEH  =  0. # silk damping scale
-        self.fracBEH  =  0. # baryon fraction
-        self.fracCEH  =  1. # CDM fraction
-
-
 
 def poutLINEAR(akinput, z, hI, twopi3):
     # this gives the linear power spectrum in unit of (Mpc/h)^3
@@ -43,13 +27,13 @@ def poutNONLINEAR(akinput, z, hI, twopi3):
     
     return poutNONLINEAR
 
-def poutLINEARnoh(ak, z):
+def poutLINEARnoh(ak, z, cosmo, power):
     # This gives the linear power spectrum in unit of (Mpc)^3 <-- no h's !
     # where Δ = k^3 poutLINEARnoh / (2pi)^3
     # and where ak is in 1/Mpc <-- no h !
     global p, twopi3  # Assuming p and twopi3 are defined elsewhere
 
-    poutLINEARnoh = p(ak, z) * twopi3
+    poutLINEARnoh = p(ak, z, cosmo, power) * twopi3
 
     return poutLINEARnoh
 
@@ -68,21 +52,20 @@ def poutNONLINEARnoh(ak, z):
 
 
 
-def pini(cosmo,power,tEH_params):
+def pini(cosmo,power):
     # normalize the power spectrum
-    import scipy.integrate as sp
 
     h00 = 100.0 * cosmo.hI
     akmax = h00 / 8.0
     power.pnorm = 1.0
-    sig0 = 4 * np.pi * sp.romberg(dsig8, 0.0, akmax, args=(cosmo,power,tEH_params), tol=1.0e-7)
+    sig0 = 4 * np.pi * sp.quad(dsig8, 0.0, akmax, args=(cosmo,power), epsabs=1.0e-7)[0]
     power.pnorm = power.sigma8**2 / sig0
     print('pnorm is', power.pnorm)
-    sig0 = 4 * np.pi * sp.romberg(dsig8, 0.0, akmax, args=(cosmo,power,tEH_params), tol=1.0e-7)
+    sig0 = 4 * np.pi * sp.quad(dsig8, 0.0, akmax, args=(cosmo,power), epsabs=1.0e-7)[0]
     print('sigma8 is', np.sqrt(sig0))
     return
 
-def dsig8(ak,cosmo,power,tEH_params):
+def dsig8(ak,cosmo,power):
     # This function calculates the integrand for the normalization of the
     # power spectrum with Delta = 1 at r = 8 Mpc/h.
     h0 = 100.0 * cosmo.hI
@@ -93,7 +76,7 @@ def dsig8(ak,cosmo,power,tEH_params):
     # Window function for spherical tophat of radius 8 Mpc/h.
     x = ak * 800.0 / h0
     w = 3.0 * (np.sin(x) - x * np.cos(x)) / (x**3)
-    return ak**2 * p(ak, 0.0,cosmo, power,tEH_params) * w**2
+    return ak**2 * p(ak, 0.0,cosmo, power) * w**2
 
 
 
@@ -106,8 +89,8 @@ def pNLini(z,cosmo,power):
     # which is the same as Ed's p i.e. 4pi^3 P_roman
     # gives the right Delta
 
-    akrpass = np.zeros(power.nplot)
-    prpass = np.zeros(power.nplot)
+    power.akrpass = np.zeros(power.nplot)
+    power.prpass = np.zeros(power.nplot)
     if power.iJMW == 1:
         # use Jain, Mo and White
         if cosmo.omegamI != 1.0:
@@ -142,10 +125,10 @@ def pNLini(z,cosmo,power):
             # akrpass[i] = akeff
             # prpass[i] = PowerE
 
-            akrpass[i] = akeff
-            prpass[i] = PowerE
+            power.akrpass[i] = akeff
+            power.prpass[i] = PowerE
 
-    elif iPD == 1:
+    elif power.iPD == 1:
         # use Peacock and Dodds
 
         dlkp = np.log(power.akplotmaxP / power.akplotminP) / (power.nplot - 1)
@@ -171,17 +154,17 @@ def pNLini(z,cosmo,power):
             PowerE = DeltaE / (4.0 * np.pi * (akeff ** 3))
 
             # instead of ak, I stored ln(ak)
-            akrpass[i] = np.log(akeff)
+            power.akrpass[i] = np.log(akeff)
 
             # instead of storing power, I store ln (P).
-            prpass[i] = np.log(PowerE)
+            power.prpass[i] = np.log(PowerE)
 
-    elif iSmith == 1:
+    elif power.iSmith == 1:
         # this uses the halo fitting formula in Smith, Peacock et al.
         # first, need to search for aksigma, aneff, and Ceff, which are
         # all defined at sigma^2 (R) = 1, which is Gaussian smoothed.
 
-        aksigma, aneff, Ceff = findksigma(z)
+        aksigma, aneff, Ceff = findksigma(z,cosmo,power)
         print('findaksigma', z, 1.0 / aksigma, aneff, Ceff)
 
         asmith = 1.4861 + 1.8369 * aneff + 1.6762 * aneff ** 2 + 0.7940 * aneff ** 3 + 0.1670 * aneff ** 4 - 0.6206 * Ceff
@@ -205,10 +188,10 @@ def pNLini(z,cosmo,power):
         anusmith = 0.9589 + 1.2857 * aneff
         anusmith = 10.0 ** anusmith
 
-        if abs(cosmo.omegak) < 1.0e-10:
-            f1smith = cosmo.omegam ** (-0.0307)
-            f2smith = cosmo.omegam ** (-0.0585)
-            f3smith = cosmo.omegam ** 0.0743
+        if abs(cosmo.omegakI) < 1.0e-10:
+            f1smith = cosmo.omegamI ** (-0.0307)
+            f2smith = cosmo.omegamI ** (-0.0585)
+            f3smith = cosmo.omegamI ** 0.0743
         else:
             print('need more work')
             raise SystemExit
@@ -218,7 +201,7 @@ def pNLini(z,cosmo,power):
         for i in range(power.nplot):
             ak = power.akplotminP * np.exp(np.float64(i) * dlkp)
 
-            DeltaL = p(ak, z) * 4.0 * np.pi * ak ** 3
+            DeltaL = p(ak, z, cosmo, power) * 4.0 * np.pi * ak ** 3
 
             ay = ak / aksigma
 
@@ -230,13 +213,13 @@ def pNLini(z,cosmo,power):
 
             DeltaE = DeltaQ + DeltaH
             PowerE=DeltaE/4.0/np.pi/(ak**3)
-            akrpass[i]=np.log(ak)
-            prpass[i]=np.log(PowerE)
+            power.akrpass[i]=np.log(ak)
+            power.prpass[i]=np.log(PowerE)
 
 
-    return akrpass, prpass
+    return 
 
-def p(ak, z, cosmo, power,tEH_params):
+def p(ak, z, cosmo, power):
     #  p evaluates the linear power spectrum at wavenumber ak for 
     #  expansion factor a=1.
     #  N.B. p is the 3-D spectral density and has units of 1/(ak*ak*ak).
@@ -282,7 +265,7 @@ def p(ak, z, cosmo, power,tEH_params):
         t = 1.0 + (aEBW + bEBW**1.5 + cEBW**2)**anuEBW
         t = 1.0 / (t**(1.0 / anuEBW))
     elif power.iBBKS == 4:
-        t = transferEH(ak,tEH_params)
+        t = transferEH(ak,power)
 
     if power.iBBKS == 2:
         if cosmo.omeganuI != 0:
@@ -311,7 +294,7 @@ def p(ak, z, cosmo, power,tEH_params):
     if cosmo.omegamI == 1.0:
         p /= (1.0 + z)**2
     else:
-        p *= (Tgrowthfac(z, cosmo)**2)
+        p *= (Tgrowthfac(z, cosmo,power)**2)
 
     return p
 
@@ -327,8 +310,8 @@ def pNL(ak, z, cosmo,power):
     akr = np.zeros(power.nplot)
 
     for i in range(power.nplot):
-        akr[i] = akrpass[i]
-        pr[i] = prpass[i]
+        akr[i] = power.akrpass[i]
+        pr[i] = power.prpass[i]
 
     iok = 0
     pNL = 0.0
@@ -442,16 +425,135 @@ def pNLinibig(z, izint, zkrpass, cosmo, power):
 
     return
 
-def transferEH(ak,tEH_params):
+def findksigma(z,cosmo,power):
+    aksigma = 0.0
+    aneff = 0.0
+    Ceff = 0.0
+    aneff2 = 0.0
+    sig2G = 0.0
+    sig2Gone = 0.0
+    sig2G2 = 0.0
+    aR = 1.0
+    itry = 0
+    itrymax = 1000
+    fact = 1.01
+    tolsig2G = 1.0e-4
+
+    # find aksigma by bisection
+    sig2G = sigmaGausscomp(aR, z,cosmo,power)
+
+    itry = 0
+
+    if sig2G > 1.0:
+        aRL = aR
+        # need to locate upper limit to aR
+        while True:
+            aR *= 2.0
+            sig2G = sigmaGausscomp(aR, z,cosmo,power)
+            if sig2G > 1.0 and itry < itrymax:
+                itry += 1
+            else:
+                aRU = aR
+                break
+    else:
+        aRU = aR
+        # need to locate lower limit to aR
+        while True:
+            aR /= 2.0
+            sig2G = sigmaGausscomp(aR, z,cosmo,power)
+            if sig2G <= 1.0 and itry < itrymax:
+                itry += 1
+            else:
+                aRL = aR
+                break
+
+    if itry >= itrymax:
+        print('cannot bracket')
+        print(itry)
+        return
+
+    # good. we have bracketed the range.
+    itry = 0
+
+    while True:
+        aR = (aRL + aRU) / 2.0
+        sig2G = sigmaGausscomp(aR, z,cosmo,power)
+
+        if abs(sig2G - 1.0) < tolsig2G:
+            aRone = aR
+            sig2Gone = sig2G
+            break
+
+        if sig2G > 1.0 and itry < itrymax:
+            aRL = aR
+            itry += 1
+        elif sig2G <= 1.0 and itry < itrymax:
+            aRU = aR
+            itry += 1
+
+        if itry >= itrymax:
+            print('too many its')
+            return
+
+    # aRone found, now compute aneff and Ceff
+    aksigma = 1.0 / aRone
+    aR = aRone * fact
+
+    sig2G = sigmaGausscomp(aR, z,cosmo,power)
+
+    aneff = -3.0 - (np.log(sig2G / sig2Gone)) / (np.log(aR / aRone))
+
+    aR2 = aRone * fact * fact
+
+    sig2G2 = sigmaGausscomp(aR2, z,cosmo,power)
+
+    aneff2 = -3.0 - (np.log(sig2G2 / sig2G)) / (np.log(aR2 / aR))
+
+    Ceff = (aneff2 - aneff) / (np.log(aR / aRone))
+
+    return aksigma, aneff, Ceff
+
+def sigmaGausscomp(aR, z, cosmo, power):
+    aRpass = aR
+    zpass = z
+
+    neq = 1
+    y = np.zeros(neq)
+    c = np.zeros(24)
+    work = np.zeros((neq, 9))
+    tol = 1.0e-12
+    xstart = power.akplotminP
+    xend = 50.0 / aR
+
+    ier = 0
+    ind = 1
+    y, err = sp.quad(derivsig2G, xstart, xend, args=(aR,z,cosmo,power))
+
+    if ind < 0 or ier > 0:
+        print(f'dverk error, ind, ier= {ind}, {ier}')
+        print(f'whats {aR}, {z}, {y[0]}')
+
+    sig2G = y * 4*np.pi
+
+    return sig2G
+
+def derivsig2G(k, aRpass, z, cosmo, power):
+
+    dydx = p(k, z, cosmo, power) * k * k * np.exp(-(k * aRpass) ** 2)
+
+    return dydx
+
+
+def transferEH(ak,power):
     '''this implements Eisenstein and Hu's transfer function - the one with CDM and baryons, but no neutrinos i.e. astro-ph/9709112
     '''
     argtol=1.0e-8
     
-    qEH=ak/13.41/tEH_params.keqEH
-    fEH=1.0/(1.0 + (ak*tEH_params.sEH/5.4)**4)
-    TcEH = fEH*T0tildeEH(ak,1.0,tEH_params.betacEH,qEH) + (1.0-fEH)*T0tildeEH(ak,tEH_params.alphacEH,tEH_params.betacEH,qEH)
+    qEH=ak/13.41/power.keqEH
+    fEH=1.0/(1.0 + (ak*power.sEH/5.4)**4)
+    TcEH = fEH*T0tildeEH(ak,1.0,power.betacEH,qEH) + (1.0-fEH)*T0tildeEH(ak,power.alphacEH,power.betacEH,qEH)
     
-    stildeEH=tEH_params.sEH/(1.0 + (tEH_params.betanodeEH/ak/tEH_params.sEH)**3)**(1.0/3.0)
+    stildeEH=power.sEH/(1.0 + (power.betanodeEH/ak/power.sEH)**3)**(1.0/3.0)
     
     arg=ak*stildeEH
     
@@ -460,9 +562,9 @@ def transferEH(ak,tEH_params):
     else:
         j0tmp=np.sin(arg)/arg
         
-    TbEH = ( T0tildeEH(ak,1.0,1.0,qEH)/(1.0+(ak*tEH_params.sEH/5.2)**2) + tEH_params.alphabEH/(1.0 + (tEH_params.betabEH/ak/tEH_params.sEH)**3)*np.exp(-(ak/tEH_params.ksilkEH)**1.4) )*j0tmp
+    TbEH = ( T0tildeEH(ak,1.0,1.0,qEH)/(1.0+(ak*power.sEH/5.2)**2) + power.alphabEH/(1.0 + (power.betabEH/ak/power.sEH)**3)*np.exp(-(ak/power.ksilkEH)**1.4) )*j0tmp
     
-    transferEH=tEH_params.fracBEH*TbEH + tEH_params.fracCEH*TcEH
+    transferEH=power.fracBEH*TbEH + power.fracCEH*TcEH
     
     return transferEH
 
@@ -480,7 +582,6 @@ def	T0tildeEH(ak,a,b,qEH):
 def initializeEH(cosmo,power):
     ''''''
 
-    tEH_params = TransferEH_params('Original')
     Omegabh2EH=cosmo.omegabI*cosmo.hI**2
     OmegacEH=cosmo.omegamI - cosmo.omegabI
     Omega0h2EH=cosmo.omegamI*cosmo.hI**2
@@ -495,29 +596,29 @@ def initializeEH(cosmo,power):
     
     RdEH=31.5*Omegabh2EH/cosmo.Theta27**4/(zdEH/1.0e3)
     ReqEH=31.5*Omegabh2EH/cosmo.Theta27**4/(zeqEH/1.0e3)
-    tEH_params.keqEH=7.46e-2*Omega0h2EH/cosmo.Theta27**2
+    power.keqEH=7.46e-2*Omega0h2EH/cosmo.Theta27**2
     
-    tEH_params.sEH=2.0/3.0/tEH_params.keqEH*(6.0/ReqEH)**0.5*np.log(((1.0+RdEH)**0.5 + (RdEH+ReqEH)**0.5)/(1.0+ReqEH**0.5))
+    power.sEH=2.0/3.0/power.keqEH*(6.0/ReqEH)**0.5*np.log(((1.0+RdEH)**0.5 + (RdEH+ReqEH)**0.5)/(1.0+ReqEH**0.5))
     
     a1EH=(46.9*Omega0h2EH)**0.67*(1.0+(32.1*Omega0h2EH)**(-0.532))
     
     a2EH=(12.0*Omega0h2EH)**0.424*(1.0+(45.0*Omega0h2EH)**(-0.582))
-    tEH_params.alphacEH=1.0/(a1EH**(fracBEH)*a2EH**((fracBEH)**3))
+    power.alphacEH=1.0/(a1EH**(fracBEH)*a2EH**((fracBEH)**3))
     
     b1EH=0.944/(1.0+(458.0*Omega0h2EH)**(-0.708))
     b2EH=1.0/(0.395*Omega0h2EH)**0.0266
     
-    tEH_params.betacEH=1.0/(1.0+b1EH*((fracCEH)**b2EH-1.0))
+    power.betacEH=1.0/(1.0+b1EH*((fracCEH)**b2EH-1.0))
     
-    tEH_params.alphabEH=2.07*tEH_params.keqEH*tEH_params.sEH*(1.0+RdEH)**(-0.75)*GEH((1.0+zeqEH)/(1.0+zdEH))
+    power.alphabEH=2.07*power.keqEH*power.sEH*(1.0+RdEH)**(-0.75)*GEH((1.0+zeqEH)/(1.0+zdEH))
     
-    tEH_params.ksilkEH=1.6*(Omegabh2EH)**0.52*(Omega0h2EH)**0.73*(1.0+(10.4*Omega0h2EH)**(-0.95))
+    power.ksilkEH=1.6*(Omegabh2EH)**0.52*(Omega0h2EH)**0.73*(1.0+(10.4*Omega0h2EH)**(-0.95))
     
-    tEH_params.betabEH=0.5+(fracBEH)+(3.0-2.0*fracBEH)*( (17.2*Omega0h2EH)**2 + 1 )**0.5
+    power.betabEH=0.5+(fracBEH)+(3.0-2.0*fracBEH)*( (17.2*Omega0h2EH)**2 + 1 )**0.5
     
-    tEH_params.betanodeEH=8.41*(Omega0h2EH)**0.435
+    power.betanodeEH=8.41*(Omega0h2EH)**0.435
     
-    return tEH_params
+    return
 
 def GEH(y):
     ''''''
@@ -528,33 +629,34 @@ def GEH(y):
 def initializePower(cosmo,power):
 
     if cosmo.omegaQI != 0.0:
-        g = growthini(power)
+        g = growthini(cosmo,power)
 
 
     if power.iBBKS == 4:
-        tEH_params = initializeEH(cosmo,power)
+        out = initializeEH(cosmo,power)
 
-    g = pini(cosmo,power,tEH_params)
+    g = pini(cosmo,power)
 
     return
 
 def main():
-    # Initialize the power
-    # if omegaQI != 0.0:
-    #     growthini()
 
-    pini()
+    cosmo_fid = cosmo_params('LCDM')
+    power_fid = power_params('Original')
+    # Initialize the power
+
+    initializePower(cosmo_fid,power_fid)
 
     # Will do the nonlinear power spectrum later
     z = float(input('Input redshift: '))
     akinput = float(input('Input k in h divided by Mpc: '))
 
-    ak = akinput * hI
+    ak = akinput * cosmo_fid.hI
 
-    pNLini(z)
+    pNLini(z,cosmo_fid,power_fid)
 
-    poutLINEAR = p(ak, z) * hI**3 * twopi3
-    poutNONLINEAR = pNL(ak, z) * hI**3 * twopi3
+    poutLINEAR = p(ak, z,cosmo_fid,power_fid) * cosmo_fid.hI**3 * twopi3
+    poutNONLINEAR = pNL(ak, z,cosmo_fid,power_fid) * cosmo_fid.hI**3 * twopi3
 
     print('Output linear power:', poutLINEAR)
     print('Output nonlinear power:', poutNONLINEAR)
