@@ -94,8 +94,8 @@ class power_params(object):
 		# This controls the minimum and maximum r's in the table, in Mpc (no h's).
 		# Should choose rPSmin to be fairly small, because I will approximate ar=0 with it.
 		self.rPSmin=0.1
-		self.rPSmax=1.e+4	
-        # parameters holding the coefficients for the Eisenstein and Hu's transfer function
+		self.rPSmax=1.e+4
+		# parameters holding the coefficients for the Eisenstein and Hu's transfer function
 		self.keqEH = 0. # equality k
 		self.sEH = 0. # exponent
 		self.alphacEH = 0. # alpha associated with CDM

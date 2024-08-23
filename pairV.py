@@ -137,15 +137,16 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo,power,imethod):
 		if ipair == 1:
 			initializePower(cosmo,power)
 
-		fac1, Dprimeoverc1, chi1 = cosmocompute(z1,cosmo)
-		fac2, Dprimeoverc2, chi2 = cosmocompute(z2,cosmo)
+		fac1, Dprimeoverc1, chi1 = cosmocompute(z1,cosmo,power)
+		fac2, Dprimeoverc2, chi2 = cosmocompute(z2,cosmo,power)
 
 		if power.ipvelLINEAR != 1:
 			if ipair == 1:
 				pNLini(0.0)
 
+		angr1, angr2, rsep = angsep2(dtheta, chi1, chi2,cosmo)
 		if ipair == 1 and veldisp <= veldisptol:
-			Cvfac = Cvintegrate0(power)
+			Cvfac = Cvintegrate0(cosmo,power)
 			Cvfacsave = Cvfac
 
 		if dtheta < dthetatol and abs(z1 - z2) < dztol:
@@ -157,7 +158,7 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo,power,imethod):
 				Cvfac = Cvfacsave
 	
 		else:
-			Cvfac = cvintegrate1(chi1, chi2, dtheta,power)
+			Cvfac = cvintegrate1(chi1, chi2, dtheta,cosmo,power)
 
 		Cv = (5.0 / np.log(10.0))**2 * fac1 * fac2 * Dprimeoverc1 * Dprimeoverc2 * Cvfac
 		xiV = Dprimeoverc1 * Dprimeoverc2 * Cvfac * cspeed**2
@@ -194,7 +195,7 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo,power,imethod):
 		Cv = (5.0 / np.log(10.0))**2 * fac1 * fac2 * Dprimeoverc1 * Dprimeoverc2 * Cvfac
 		xiV = Dprimeoverc1 * Dprimeoverc2 * Cvfac * cspeed**2
 
-	return Cv, dtheta, xiV
+	return Cv, dtheta, xiV, rsep
 
 def angsep(ra1, dec1, ra2, dec2):
 	idegree = 1
@@ -253,7 +254,7 @@ def cosmocompute(z,cosmo,power):
 
 
 
-def cvintegrate1(chi1, chi2, dtheta, power, Nellmax=200):
+def cvintegrate1(chi1, chi2, dtheta, cosmo,power, Nellmax=200):
 	''' This computes Cvfac, given inputs chi1, chi2, dtheta
 	    Cvfac is \int_0^\infty dk (dk/2\pi^2) P(k, z=0) 
 	    \sum_0^\infty (2\ell + 1) j'_ell (kchi1) j'_ell (kchi2) P_ell (cos(theta))
@@ -269,14 +270,14 @@ def cvintegrate1(chi1, chi2, dtheta, power, Nellmax=200):
 
 	Cvfac = 0.0
 	for il in range(Nellmax):
-		Cvfacpower = cvfacpowercompute(il, chi1, chi2,power)
+		Cvfacpower = cvfacpowercompute(il, chi1, chi2,cosmo,power)
 		x = np.cos(dtheta)
 		legenfac = sp.lpmv(0, il, x)
 		Cvfac += (2.0 * il + 1.0) * Cvfacpower * legenfac
 
 	return Cvfac
 
-def cvfacpowercompute(il, chi1, chi2,power):
+def cvfacpowercompute(il, chi1, chi2,cosmo,power):
 	'''This returns Cvfacpower given il, chi1, chi2
 	Cvfacpower = \int_0^\infty (dk/2pi^2) P(k, z=0) j'_il (kchi1) j'_il (kchi2)'''
 	import scipy.special as sp
@@ -307,14 +308,14 @@ def cvfacpowercompute(il, chi1, chi2,power):
 		ak = akplotmin * np.exp(dlkp * int)
 
 		if power.ipvelLINEAR == 1:
-			puse = poutLINEARnoh(ak, 0.0)
+			puse = poutLINEARnoh(ak, 0.0,cosmo,power)
 		else:
-			puse = poutNONLINEARnoh(ak, 0.0)
+			puse = poutNONLINEARnoh(ak, 0.0,cosmo,power)
 
 	x = ak * chi1
-	sj, sjp1 = sp.spherical_jn(il, x)
+	sjp1 = sp.spherical_jn(il, x)
 	x = ak * chi2
-	sj, sjp2 = sp.spherical_jn(il, x)
+	sjp2 = sp.spherical_jn(il, x)
 
 	Cvfacpower += ak * puse * sjp1 * sjp2
 
@@ -323,44 +324,35 @@ def cvfacpowercompute(il, chi1, chi2,power):
 	return Cvfacpower
 
 
-def Cvintegrate0(power):
+def Cvintegrate0(cosmo,power):
 	'''This outputs Cvfac
 	Cvfac = (1/3) \int (dk/2 pi^2) P(k,z=0), which comes from
 	= \int (d^3 k /(2\pi^3)) (1/k^2) (cos(theta))^2 P(k,z=0)'''
 
-	import scipy.integrate
+	import scipy.integrate as sp
 
 	dlkp = np.log(power.akplotmaxP / power.akplotminP) / (power.nplot - 1)
 	xstart = power.akplotminP * np.exp(dlkp)
 	xend = power.akplotmaxP / np.exp(dlkp)
 
 	tol = 1.0e-10
-	ier = 0
-	ind = 1
-	y = np.zeros(1)
-	c = np.zeros(24)
-	work = np.zeros((1, 9))
 
-	y = integrate.odeint(derive0, xstart, y, xend, tol, ind, c, 1, work, ier)
+	y = sp.quad(derive0, xstart, xend,args=(cosmo,power))[0]
 
-	if ind < 0 or ier > 0:
-		print(f'dverk error, ind, ier= {ind}, {ier}')
-
-	Cvfac = y[0] / (2.0 / np.pi / np.pi / 3.0)
+	Cvfac = y / (2.0 / np.pi / np.pi / 3.0)
 
 	return Cvfac
 
 
 
-def derive0(n, x, y,power):
-	dydx = np.zeros(n)
+def derive0(x,cosmo,power):
 
 	if power.ipvelLINEAR == 1:
-		puse = poutLINEARnoh(x, 0.0)
+		puse = poutLINEARnoh(x, 0.0,cosmo,power)
 	else:
-		puse = poutNONLINEARnoh(x, 0.0)
+		puse = poutNONLINEARnoh(x, 0.0,cosmo,power)
 
-	dydx[0] = puse
+	dydx = puse
 
 	return dydx
  
@@ -539,7 +531,7 @@ if __name__ == "__main__":
 	# imethod=1 is the observer-centric method.
 	# imethod=2 is the separation-centric method.
 	# method 2 is faster.
-	imethod=2
+	imethod=1
 	if ioperatemode == 1:
 		RA1 = float(input('input RA for SN 1: '))
 		DEC1 = float(input('input DEC for SN 1: '))
@@ -548,8 +540,9 @@ if __name__ == "__main__":
 		DEC2 = float(input('input DEC for SN 2: '))
 		z2 = float(input('input z for SN 2: '))
 		ipair = 1
-		Cv, dtheta, xiV = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo_fid,power_fid,imethod)
+		Cv, dtheta, xiV, rsep = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo_fid,power_fid,imethod)
 		print('Cv and dtheta are', Cv, dtheta * 180.0 / pi)
+		print('r-separation is ',rsep)
 		print('xiV is', xiV)
 
 	elif ioperatemode == 2:
@@ -590,9 +583,9 @@ if __name__ == "__main__":
 					RA2 = RA[j]
 					DEC2 = DEC[j]
 					z2 = z[j]
-					Cv, dtheta, xiV = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo_fid,power_fid,imethod)
+					Cv, dtheta, xiV, rsep = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo_fid,power_fid,imethod)
 
-					f3.write(f"{Cv:.8e} {dtheta * 180.0 / pi:.8e} {SNname[i]} {RA[i]} {DEC[i]} {z[i]} {SNname[j]} {RA[j]} {DEC[j]} {z[j]} {i + 1} {j + 1} {xiV:.8e}\n")
+					f3.write(f"{Cv:.8e} {dtheta * 180.0 / pi:.8e} {SNname[i]} {RA[i]} {DEC[i]} {z[i]} {SNname[j]} {RA[j]} {DEC[j]} {z[j]} {i + 1} {j + 1} {rsep:.8e} {xiV:.8e}\n")
 					print(Cv, i + 1, j + 1)
 
 	elif ioperatemode == 3:
@@ -632,7 +625,7 @@ if __name__ == "__main__":
 					RA2 = RA1 + angleinput
 
 				ipair += 1
-				Cv, dtheta, xiV = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo_fid,power_fid,imethod)
+				Cv, dtheta, xiV, rsep = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo_fid,power_fid,imethod)
 
 				f3.write(f"{Cv} {dtheta * 180.0 / pi} {z2} {xiV}\n")
 
