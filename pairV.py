@@ -3,65 +3,13 @@ from init import cosmo_params, power_params
 from powerplot import initializePower, pNLini, poutLINEARnoh,poutNONLINEARnoh
 from universal import Tgrowthfac,growthfac,phiPD
 from angdiamQp import chiRQ, HzzQ
-# This code is written by Lam Hui. When using it, please
+
+cspeed=2.99792458e5 #speed of light
+
+# This code is a python port of a code written by Lam Hui. When using it, please
 # acknowledge the paper
 # L. Hui, P. B. Greene, Phys. Rev. D73, 123526 (2006) 
 # [arXiv:astro-ph/0512159].
-
-# An explanatory note on the quantity computed in this code, Cv
-# the magnitude covariance from peculiar motion, can be found
-# in notes.pdf. This code also outputs xiV, the velocity
-# two-point function in (km/s)^2, defined in notes.pdf.
-
-# Tips for running this code:
-
-# (1) Parameter: ioperatemode, defined in the driver program pairV.
-
-# If ioperatemode=1, then the code is run in interative mode:
-# given RA,DEC,z for 2 SNe, the code outputs Cv 
-# (i.e. magnitude covariance due to v)
-# and dtheta*180/pi (i.e. angular separation in degrees), and xiV.
-
-# If ioperatemode=2, then the code is run in non-interative mode:
-# the inputs are in table.input and table.input2, where
-# table.input has 2 columns: SN name, and survey name
-# table.input2 has 3 columns: RA, DEC and z.
-# The output is table.output, which consists of
-# Cv (i.e. magnitude covariance due to v), angular separation in degree,
-# SN1_name, RA1, DEC1, z1, SN2_name, RA2, DEC2, z2, 1_label, 2_label, xiV.
-
-# If ioperatemode=3, then the code is run to output a table
-# of Cv and xiV
-# as a function of angular separation, for a given input redshift.
-# This is useful for making a plot of Cv and xiV.
-
-# (2) Parameter: imethod, defined in snlens.inc
-
-# If imethod=1, compute Cv and xiV using the observer-centric formula.
-# If imethod=2, compute Cv and xiV using the separation-centric formula.
-# imethod=2 is faster. Consistency between the two methods is
-# a good check of the code.
-
-# (3) Parameter: veldisp, defined in snlens.inc
-
-# This define the velocity dispersion (km/s) at zero angular 
-# separation.
-# If one does not wish to set it by hand, but instead wants to
-# compute it using the same code as for non-zero separations,
-# then simply set veldisp=0.
-# This option is introduced mostly because the recommended
-# procedure is to run the code using linear theory (see below),
-# in which case one might worry that the predicted velocity
-# dispersion at zero separation is under-estimated.
-# In reality, this does not seem to be a big problem.
-
-# (4) Parameter: ipvelLINEAR, defined in snlens.inc
-
-# Choose ipvelLINEAR=1 if wants to use linear theory (recommended),
-# otherwise choose ipvelLINEAR=0 to use a nonlinear power spectrum.
-
-# (5) Parameters: ireadPiSigtable and iwritePiSigtable, defined in 
-#     snlens.inc
 
 # When running this code for the first time, set ireadPiSigtable=0
 # and iwritePiSigtable=0
@@ -71,37 +19,6 @@ from angdiamQp import chiRQ, HzzQ
 # and iwritePiSigtable=0, which takes advantage of a pre-computed
 # table of xiV (which was written out when ireadPiSigtable=0 and
 # iwritePiSigtable=1).
-
-# (6) Parameter: zmaxact, defined in snlens.inc
-
-# This sets the maximum redshift of interest. By default it is
-# set to 5.0. Change to a higher number if one is interested in
-# a higher redshift. This is used in pre-computing a table
-# of growth factor.
-
-# Universal parameters
-
-cspeed=2.99792458e5 #speed of light
-
-pi=3.1415926535898
-twopi=2.0*pi
-twopi2=twopi**2
-twopi3=twopi**3
-fourpi=2.0*twopi
-
-# *Control parameters*
-
-# If want to set the velocity dispersion at zero separation
-# (i.e. i equals j) by hand, 
-# then set the following quantity to be non-zero (in km/s).
-# Otherwise, set to be 0.0d0.
-
-veldisp=0.0
-# veldisp=300.0
-
-# This controls what angular separation (in radian) is small enough	
-# that we will regard the pair to refer to the same SN.
-dthetatol=pi/180./60./60.
 
 # Set the following to 1 if want to read Pifunc and Sigfunc from an existing table
 # (see comments in subroutine initpairVV). Otherwise set to 0.
@@ -129,6 +46,10 @@ iwritePiSigtable=1
 # dtheta is in radians.
 def pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo,power,imethod):
 	Cvfacsave = 0.0  # Initialize Cvfacsave
+
+	# This controls what angular separation (in radian) is small enough	
+	# that we will regard the pair to refer to the same SN.
+	dthetatol=np.pi/180./60./60.
 	veldisptol = 1.0e-3
 	dztol = 1.0e-8
 	if imethod == 1:
@@ -145,14 +66,14 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo,power,imethod):
 				pNLini(0.0)
 
 		angr1, angr2, rsep = angsep2(dtheta, chi1, chi2,cosmo)
-		if ipair == 1 and veldisp <= veldisptol:
+		if ipair == 1 and power.veldisp <= veldisptol:
 			Cvfac = Cvintegrate0(cosmo,power)
 			Cvfacsave = Cvfac
 
 		if dtheta < dthetatol and abs(z1 - z2) < dztol:
-			if veldisp > veldisptol:
-				Cv = (5.0 / np.log(10.0))**2 * fac1 * fac2 * (veldisp / cspeed)**2
-				xiV = veldisp**2
+			if power.veldisp > veldisptol:
+				Cv = (5.0 / np.log(10.0))**2 * fac1 * fac2 * (power.veldisp / cspeed)**2
+				xiV = power.veldisp**2
 				return Cv, dtheta, xiV
 			else:
 				Cvfac = Cvfacsave
@@ -183,9 +104,9 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo,power,imethod):
 		angr1, angr2, rsep = angsep2(dtheta, chi1, chi2,cosmo)
 
 		if dtheta < dthetatol and np.abs(z1 - z2) < dztol:
-			if veldisp > veldisptol:
-				Cv = (5.0 / np.log(10.0))**2 * fac1 * fac2 * (veldisp / cspeed)**2
-				xiV = veldisp**2
+			if power.veldisp > veldisptol:
+				Cv = (5.0 / np.log(10.0))**2 * fac1 * fac2 * (power.veldisp / cspeed)**2
+				xiV = power.veldisp**2
 				return Cv, dtheta, xiV
 
 
@@ -522,16 +443,44 @@ def PiSig(power, ar):
 
 
 #---------------------------------------------------
+# An explanatory note on the quantity computed in this code, Cv
+# the magnitude covariance from peculiar motion, can be found
+# in notes.pdf. This code also outputs xiV, the velocity
+# two-point function in (km/s)^2, defined in notes.pdf.
+
 if __name__ == "__main__":
 
 	cosmo_fid = cosmo_params('LCDM')
 	power_fid = power_params('Original')
-	ioperatemode = 2
+
 	# This controls which method to use for computing Cv.
 	# imethod=1 is the observer-centric method.
 	# imethod=2 is the separation-centric method.
 	# method 2 is faster.
-	imethod=1
+	
+	imethod=2
+
+	# (1) Parameter: ioperatemode, defined in the driver program pairV.
+
+	# If ioperatemode=1, then the code is run in interative mode:
+	# given RA,DEC,z for 2 SNe, the code outputs Cv 
+	# (i.e. magnitude covariance due to v)
+	# and dtheta*180/pi (i.e. angular separation in degrees), and xiV.
+
+	# If ioperatemode=2, then the code is run in non-interative mode:
+	# the inputs are in table.input and table.input2, where
+	# table.input has 2 columns: SN name, and survey name
+	# table.input2 has 3 columns: RA, DEC and z.
+	# The output is table.output, which consists of
+	# Cv (i.e. magnitude covariance due to v), angular separation in degree,
+	# SN1_name, RA1, DEC1, z1, SN2_name, RA2, DEC2, z2, 1_label, 2_label, xiV.
+
+	# If ioperatemode=3, then the code is run to output a table
+	# of Cv and xiV
+	# as a function of angular separation, for a given input redshift.
+	# This is useful for making a plot of Cv and xiV.
+	ioperatemode = 2
+
 	if ioperatemode == 1:
 		RA1 = float(input('input RA for SN 1: '))
 		DEC1 = float(input('input DEC for SN 1: '))
@@ -574,6 +523,7 @@ if __name__ == "__main__":
 		ipair = 0
 
 		with open('table.output', 'w') as f3:
+			f3.write("COV DIST CID1 RA1 DEC1 z1 CID2 RA2 DEC2 z2 ID1 ID2 CORR\n")
 			for i in range(itotal):
 				for j in range(i + 1):
 					ipair += 1
@@ -585,7 +535,7 @@ if __name__ == "__main__":
 					z2 = z[j]
 					Cv, dtheta, xiV, rsep = pairVV(RA1, DEC1, z1, RA2, DEC2, z2,ipair,cosmo_fid,power_fid,imethod)
 
-					f3.write(f"{Cv:.8e} {dtheta * 180.0 / pi:.8e} {SNname[i]} {RA[i]} {DEC[i]} {z[i]} {SNname[j]} {RA[j]} {DEC[j]} {z[j]} {i + 1} {j + 1} {rsep:.8e} {xiV:.8e}\n")
+					f3.write(f"{Cv:.8e} {dtheta * 180.0 / np.pi:.8e} {SNname[i]} {RA[i]} {DEC[i]} {z[i]} {SNname[j]} {RA[j]} {DEC[j]} {z[j]} {i + 1} {j + 1} {rsep:.8e} {xiV:.8e}\n")
 					print(Cv, i + 1, j + 1)
 
 	elif ioperatemode == 3:
@@ -607,6 +557,7 @@ if __name__ == "__main__":
 			dzout = (zinputmax - zinput) / float(itotal - 1)
 
 		with open('Cv.output', 'w') as f3:
+			f3.write("COV DIST CID1 RA1 DEC1 z1 CID2 RA2 DEC2 z2 ID1 ID2 CORR\n")
 			ipair = 0
 			for i in range(itotal):
 				if ifix == 1:

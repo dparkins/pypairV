@@ -48,8 +48,23 @@ class power_params(object):
 		self.qrms=18.0
 		self.ToS=0.0
 
+		# This define the velocity dispersion (km/s) at zero angular 
+		# separation.
+		# If one does not wish to set it by hand, but instead wants to
+		# compute it using the same code as for non-zero separations,
+		# then simply set veldisp=0.
+		# This option is introduced mostly because the recommended
+		# procedure is to run the code using linear theory (see below),
+		# in which case one might worry that the predicted velocity
+		# dispersion at zero separation is under-estimated.
+		# In reality, this does not seem to be a big problem.
+		self.veldisp=0.0
+		# self.veldisp=300.0	
+
 		self.pnorm=1.0 #normaliation of power spectrum
 		# Control parameters for nonlinear power spectrum*
+		# Choose ipvelLINEAR=1 if wants to use linear theory (recommended),
+		# otherwise choose ipvelLINEAR=0 to use a nonlinear power spectrum.
 		self.ipvelLINEAR=1 # Set ipvelLINEAR=1 if wants linear power spectrum, or to 0 if wants nonlinear
 		# The following parameter is not used at all (unless I want to
 		# precompute a table of nonlinear P as a function of ak and z). 
@@ -65,7 +80,7 @@ class power_params(object):
 		self.iSmith=1 # Set iSmith=1 if want to use Smith et al. power spectrum, otherwise to 0.
 		self.ipNLinibigtable=0
 		#This controls the number of k bins I used to compute the integrals over P(k).
-		self.nplot=1000
+		self.nplot=2000
 		# This controls limits of integration for integral over P(k).
 		self.akrpass=np.zeros(self.nplot)
 		self.prpass=np.zeros(self.nplot)
@@ -81,7 +96,7 @@ class power_params(object):
 		# self.aklargeangfact=10.0
 		self.aklargeangfact=25.0
 		# This controls limit of k integration over P(k) for imethod=2
-		self.aklargeangfact2=100.
+		self.aklargeangfact2=200.
 		#growth parameters
 		self.num_growth = 100
 		self.z_growth = np.zeros(self.num_growth)
