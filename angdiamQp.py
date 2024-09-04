@@ -1,5 +1,7 @@
 import numpy as np
 import scipy.integrate as sp
+from astropy.cosmology import LambdaCDM
+import astropy.units as u
 
 # This is based on angdiamQ.f, which assumed wQ=constant.
 # Here, I want to allow for a time-varying wQ.
@@ -35,61 +37,86 @@ import scipy.integrate as sp
 #                                                                              make rho(z=0) = 1]
 #                       ~ (1+z)^3(1+wQ+wQp) * exp(-3*wQp*z/(1+z))
 #
-#------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------
 import numpy as np
 from init import cosmo_params
 
-def HzzQ(z,cosmo):
-    '''gives Hubble constant at z'''
+
+def HzzQ(z, cosmo):
+    """gives Hubble constant at z"""
 
     h00 = 100.0 * cosmo.hI
 
     if abs(cosmo.omegamI + cosmo.omegakI + cosmo.omegavI + cosmo.omegaQI - 1) > 1.0e-10:
-        print('Omegas do not sum to one')
-        print('error in HzzQ')
+        print("Omegas do not sum to one")
+        print("error in HzzQ")
         print(cosmo.omegamI + cosmo.omegakI + cosmo.omegavI + cosmo.omegaQI)
         raise SystemExit
 
     if cosmo.iwmodeI == 1:
-        hz = h00 * np.sqrt(cosmo.omegamI * (1.0 + z)**3 + cosmo.omegakI * (1.0 + z)**2 +cosmo.omegavI + cosmo.omegaQI * (1.0 + z)**(3.0 * (1.0 + cosmo.wQI)))
+        hz = h00 * np.sqrt(
+            cosmo.omegamI * (1.0 + z) ** 3
+            + cosmo.omegakI * (1.0 + z) ** 2
+            + cosmo.omegavI
+            + cosmo.omegaQI * (1.0 + z) ** (3.0 * (1.0 + cosmo.wQI))
+        )
     elif cosmo.iwmodeI == 2:
-        hz = h00 * np.sqrt(cosmo.omegamI * (1.0 + z)**3 + cosmo.omegakI * (1.0 + z)**2 +cosmo.omegavI + cosmo.omegaQI * ((1.0 + z)**(3.0 * (1.0 + cosmo.wQI - cosmo.wQpI)) *np.exp(3.0 *cosmo.wQpI * z)))
+        hz = h00 * np.sqrt(
+            cosmo.omegamI * (1.0 + z) ** 3
+            + cosmo.omegakI * (1.0 + z) ** 2
+            + cosmo.omegavI
+            + cosmo.omegaQI
+            * (
+                (1.0 + z) ** (3.0 * (1.0 + cosmo.wQI - cosmo.wQpI))
+                * np.exp(3.0 * cosmo.wQpI * z)
+            )
+        )
     elif cosmo.iwmodeI == 3:
-        hz = h00 * np.sqrt(cosmo.omegamI * (1.0 + z)**3 + cosmo.omegakI * (1.0 + z)**2 +cosmo.omegavI + cosmo.omegaQI * ((1.0 + z)**(3.0 * (1.0 + cosmo.wQI + cosmo.wQpI)) *np.exp(-3.0 * cosmo.wQpI * z / (1.0 + z))))
-
+        hz = h00 * np.sqrt(
+            cosmo.omegamI * (1.0 + z) ** 3
+            + cosmo.omegakI * (1.0 + z) ** 2
+            + cosmo.omegavI
+            + cosmo.omegaQI
+            * (
+                (1.0 + z) ** (3.0 * (1.0 + cosmo.wQI + cosmo.wQpI))
+                * np.exp(-3.0 * cosmo.wQpI * z / (1.0 + z))
+            )
+        )
 
     return hz
 
-def chiRQ(z,cosmo):
-    ''' integrates chi directly
+
+def chiRQ(z, cosmo):
+    """integrates chi directly
     see comments in rrchiQ
 
     this gives the radial comoving distance to an object at z
     where z is input in rrchi
 
     chi in unit of Mpc, if want h^-1 Mpc, then
-    take chi and multiply by h.'''
+    take chi and multiply by h."""
 
     if abs(cosmo.omegamI + cosmo.omegakI + cosmo.omegavI + cosmo.omegaQI - 1) > 1.0e-10:
-        print('Omegas do not sum to one')
-        print('error in chiRQ')
+        print("Omegas do not sum to one")
+        print("error in chiRQ")
         print(cosmo.omegamI + cosmo.omegakI + cosmo.omegavI + cosmo.omegaQI)
         raise SystemExit
-    
-    xstart = 0.
-    xend = z
-    chi, err = sp.quad(derivsQ,xstart,xend,args=(cosmo))
 
-    chi *= 2.99792458e5
+    # xstart = 0.0
+    # xend = z
+    # chi, err = sp.quad(derivsQ, xstart, xend, args=(cosmo))
 
-    return chi
+    # chi *= 2.99792458e5
+    astro = LambdaCDM(H0=cosmo.hI * 100.0, Om0=cosmo.omegamI, Ode0=cosmo.omegaQI)
+    chi = astro.comoving_distance(z)
+    return chi.value
 
 
-def derivsQ(z,cosmo):
-    '''function to integrate under to get chi'''
+def derivsQ(z, cosmo):
+    """function to integrate under to get chi"""
 
-    hz = HzzQ(z,cosmo)
+    hz = HzzQ(z, cosmo)
 
-    derivsQ = 1./hz
+    derivsQ = 1.0 / hz
 
     return derivsQ
