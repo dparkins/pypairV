@@ -61,7 +61,8 @@ def pini(cosmo, power):
     akmax = h00 / 8.0
     power.pnorm = 1.0
     sig0 = 4 * np.pi * sp.quad(dsig8, 0.0, akmax, args=(cosmo, power), epsabs=1.0e-7)[0]
-    # Here is where iBBKS=3 differs from iBBKS=4 between fortran and python
+    # print(sig0)
+    # sig0 = 1.0154419467619408e-005  # pairV gets this sig0 which gives a more accurate sigma8 than this python code
     power.pnorm = power.sigma8**2 / sig0
     print("pnorm is", power.pnorm)
     sig0 = 4 * np.pi * sp.quad(dsig8, 0.0, akmax, args=(cosmo, power), epsabs=1.0e-7)[0]
@@ -646,8 +647,8 @@ def initializeEH(cosmo, power):
     OmegacEH = cosmo.omegamI - cosmo.omegabI
     Omega0h2EH = cosmo.omegamI * cosmo.hI**2
 
-    fracBEH = cosmo.omegabI / cosmo.omegamI
-    fracCEH = OmegacEH / cosmo.omegamI
+    power.fracBEH = cosmo.omegabI / cosmo.omegamI
+    power.fracCEH = OmegacEH / cosmo.omegamI
 
     b1EH = 0.313 / (Omega0h2EH) ** 0.419 * (1.0 + 0.607 * Omega0h2EH**0.674)
     b2EH = 0.238 * Omega0h2EH**0.223
@@ -674,12 +675,12 @@ def initializeEH(cosmo, power):
     a1EH = (46.9 * Omega0h2EH) ** 0.67 * (1.0 + (32.1 * Omega0h2EH) ** (-0.532))
 
     a2EH = (12.0 * Omega0h2EH) ** 0.424 * (1.0 + (45.0 * Omega0h2EH) ** (-0.582))
-    power.alphacEH = 1.0 / (a1EH ** (fracBEH) * a2EH ** ((fracBEH) ** 3))
+    power.alphacEH = 1.0 / (a1EH ** (power.fracBEH) * a2EH ** ((power.fracBEH) ** 3))
 
     b1EH = 0.944 / (1.0 + (458.0 * Omega0h2EH) ** (-0.708))
     b2EH = 1.0 / (0.395 * Omega0h2EH) ** 0.0266
 
-    power.betacEH = 1.0 / (1.0 + b1EH * ((fracCEH) ** b2EH - 1.0))
+    power.betacEH = 1.0 / (1.0 + b1EH * ((power.fracCEH) ** b2EH - 1.0))
 
     power.alphabEH = (
         2.07
@@ -697,7 +698,9 @@ def initializeEH(cosmo, power):
     )
 
     power.betabEH = (
-        0.5 + (fracBEH) + (3.0 - 2.0 * fracBEH) * ((17.2 * Omega0h2EH) ** 2 + 1) ** 0.5
+        0.5
+        + (power.fracBEH)
+        + (3.0 - 2.0 * power.fracBEH) * ((17.2 * Omega0h2EH) ** 2 + 1) ** 0.5
     )
 
     power.betanodeEH = 8.41 * (Omega0h2EH) ** 0.435
