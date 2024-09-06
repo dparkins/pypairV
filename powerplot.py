@@ -21,17 +21,6 @@ def pout_h(akinput, z, cosmo, power):
     return pout
 
 
-# def poutNONLINEAR(akinput, z):
-#     # this gives the nonlinear power spectrum in unit of (Mpc/h)^3
-#     # where Δ = k^3 poutNONLINEAR / (2pi)^3
-#     # and where akinput is in h/Mpc
-
-#     ak = akinput * hI
-#     poutNONLINEAR = pNL(ak, z) * cosmo.hI**3 * twopi3
-
-#     return poutNONLINEAR
-
-
 def pout_noh(ak, z, cosmo, power):
     # This gives the linear/nonlinear power spectrum in unit of (Mpc)^3 <-- no h's !
     # where Δ = k^3 pout / (2pi)^3
@@ -43,23 +32,11 @@ def pout_noh(ak, z, cosmo, power):
         if power.ipNLinibigtable == 0:
             pout = pNL(ak, z, cosmo, power) * twopi3
         else:
+            print("Not implemented. Please set ipNLinibigtable to 0")
+            raise SystemExit
             pout = pNLbig(ak, z, cosmo, power) * twopi3
 
     return pout
-
-
-# def poutNONLINEARnoh(ak, z):
-#     # This gives the nonlinear power spectrum in unit of (Mpc)^3 <-- no h's !
-#     # where Δ = k^3 poutNONLINEARnoh / (2pi)^3
-#     # and where ak is in 1/Mpc <-- no h !
-#     global pNL, pNLbig, ipNLinibigtable, twopi3  # Assuming these are defined elsewhere
-
-#     if ipNLinibigtable == 0:
-#         poutNONLINEARnoh = pNL(ak, z) * twopi3
-#     else:
-#         poutNONLINEARnoh = pNLbig(ak, z) * twopi3
-
-#     return poutNONLINEARnoh
 
 
 def pini(cosmo, power):
@@ -104,6 +81,9 @@ def pNLini(z, cosmo, power):
     power.akrpass = np.zeros(power.nplot)
     power.prpass = np.zeros(power.nplot)
     if power.iJMW == 1:
+        print("Not implemented. Please set iJMW=0 and iSmith=1")
+        raise SystemExit
+
         # use Jain, Mo and White
         if cosmo.omegamI != 1.0:
             print("JMW cannot be used for omegam ne 1")
@@ -145,6 +125,9 @@ def pNLini(z, cosmo, power):
             power.prpass[i] = PowerE
 
     elif power.iPD == 1:
+        print("Not implemented. Please set iPD=0 and iSmith=1")
+        raise SystemExit
+
         # use Peacock and Dodds
 
         dlkp = np.log(power.akplotmaxP / power.akplotminP) / (power.nplot - 1)
@@ -392,6 +375,8 @@ def pNL(ak, z, cosmo, power):
 
 
 def pNLinibig(z, izint, zkrpass, cosmo, power):
+    print("Not implemented. Please set ipNLinibigtable to 0")
+    raise SystemExit
     # this is based on pNLini, the only difference is that
     # I save up all the z's at the same time.
 
@@ -443,7 +428,7 @@ def pNLinibig(z, izint, zkrpass, cosmo, power):
             akrpass[i - 1][izint] = akeff
             prpass[i - 1][izint] = PowerE
 
-    elif iPD == 1:
+    elif power.iPD == 1:
         # Use Peacock and Dodds
         dlkp = np.log(power.akplotmaxP / power.akplotminP) / (power.nplot - 1)
 
@@ -468,7 +453,12 @@ def pNLinibig(z, izint, zkrpass, cosmo, power):
 
             DeltaL = p(ak, z) * 4.0 * np.pi * ak**3
             DeltaE = phiPD(
-                DeltaL, aneff, cosmo.omegam, cosmo.omegav, cosmo.omegak, cosmo.omegaQ
+                DeltaL,
+                aneff,
+                cosmo.omegamI,
+                cosmo.omegavI,
+                cosmo.omegakI,
+                cosmo.omegaQI,
             )
             akeff = ak * (1.0 + DeltaE) ** (1.0 / 3.0)
             PowerE = DeltaE / (4.0 * np.pi * (akeff**3))
@@ -476,7 +466,7 @@ def pNLinibig(z, izint, zkrpass, cosmo, power):
             akrpass[i - 1][izint] = np.log(akeff)
             prpass[i - 1][izint] = np.log(PowerE)
 
-    elif iSmith == 1:
+    elif power.iSmith == 1:
         print("Smith et al power spectrum")
         print("not implemented for this option")
         print("Please set ipNLinibigtable to 0")

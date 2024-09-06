@@ -48,8 +48,6 @@ iwritePiSigtable = 1
 #
 # dtheta is in radians.
 def pairVV(RA1, DEC1, z1, RA2, DEC2, z2, init, cosmo, power, imethod):
-    Cvfacsave = 0.0  # Initialize Cvfacsave
-
     # This controls what angular separation (in radian) is small enough
     # that we will regard the pair to refer to the same SN.
     dthetatol = np.pi / 180.0 / 60.0 / 60.0
@@ -135,17 +133,6 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2, init, cosmo, power, imethod):
             0.0,
         )
 
-        # if dtheta < dthetatol and np.abs(z1 - z2) < dztol:
-        #     if power.veldisp > veldisptol:
-        #         Cv = (
-        #             (5.0 / np.log(10.0)) ** 2
-        #             * fac1
-        #             * fac2
-        #             * (power.veldisp / cspeed) ** 2
-        #         )
-        #         xiV = power.veldisp**2
-        #         return Cv, dtheta, xiV, rsep
-        # print(RA1, DEC1, RA2, DEC2, z1, z2, rsep)
         Pifunc, Sigfunc = PiSig(power, rsep)
         Cvfac = (
             np.cos(angr1) * np.cos(angr2) * Pifunc
@@ -160,15 +147,6 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2, init, cosmo, power, imethod):
             * Cvfac
         )
         xiV += Dprimeoverc1 * Dprimeoverc2 * Cvfac * cspeed**2
-        # Cv = (
-        #     (5.0 / np.log(10.0)) ** 2
-        #     * fac1
-        #     * fac2
-        #     * Dprimeoverc1
-        #     * Dprimeoverc2
-        #     * Cvfac
-        # )
-        # xiV = Dprimeoverc1 * Dprimeoverc2 * Cvfac * cspeed**2
 
     return Cv, dtheta, xiV, rsep
 
