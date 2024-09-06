@@ -7,6 +7,14 @@ from growthq import fgQQ, growthini
 # Constants
 twopi3 = (2 * np.pi) ** 3
 
+def pout_noh(akinput, z, cosmo, power):
+    # This gives the power spectrum in unit of (Mpc)^3 <-- no h's 
+    if power.ipvelLINEAR == 1:
+        pout_noh = poutLINEARnoh(akinput, z,cosmo,power)
+    else:
+        pout_noh = poutNONLINEARnoh(akinput, z,cosmo,power)
+
+    return pout_noh
 
 def poutLINEAR(akinput, z, hI, twopi3):
     # this gives the linear power spectrum in unit of (Mpc/h)^3
@@ -34,7 +42,6 @@ def poutLINEARnoh(ak, z, cosmo, power):
     # This gives the linear power spectrum in unit of (Mpc)^3 <-- no h's !
     # where Δ = k^3 poutLINEARnoh / (2pi)^3
     # and where ak is in 1/Mpc <-- no h !
-    global p, twopi3  # Assuming p and twopi3 are defined elsewhere
 
     poutLINEARnoh = p(ak, z, cosmo, power) * twopi3
 
@@ -260,8 +267,8 @@ def p(ak, z, cosmo, power):
     # i.e. 4pi k^3 P_ED is the right Delta
     # where 4pi k^3 / (twopi^3) P_usual is the right Delta
 
-    if ak <= 0.0:
-        return 0.0
+    #if ak <= 0.0:
+    #    return 0.0
 
     if power.iGammaI == 1:
         omegahh = power.gammaeff * cosmo.hI
@@ -435,10 +442,10 @@ def pNLinibig(z, izint, zkrpass, cosmo, power):
 
     elif iPD == 1:
         # Use Peacock and Dodds
-        dlkp = np.log(akplotmaxP / akplotminP) / (nplot - 1)
+        dlkp = np.log(power.akplotmaxP / power.akplotminP) / (power.nplot - 1)
 
-        for i in range(1, nplot + 1):
-            ak = akplotminP * np.exp((i - 1) * dlkp)
+        for i in range(1, power.nplot + 1):
+            ak = power.akplotminP * np.exp((i - 1) * dlkp)
             akslope = ak / 2.0
             aknext = akslope + dakf * akslope
             aneff1 = (np.log(p(aknext, z)) - np.log(p(akslope, z))) / (
@@ -449,7 +456,7 @@ def pNLinibig(z, izint, zkrpass, cosmo, power):
                 np.log(aknext) - np.log(akslope)
             )
 
-            if abs(aneff2 - aneff1) > antol:
+            if abs(aneff2 - aneff1) > power.antol:
                 print(aneff2, aneff1, ak, aknext)
                 print("should decrease dakf")
                 raise SystemExit
@@ -609,10 +616,10 @@ def transferEH(ak, power):
 
     arg = ak * stildeEH
 
-    if arg < argtol:
-        j0tmp = 1.0
-    else:
-        j0tmp = np.sin(arg) / arg
+    #f arg < argtol:
+    #    j0tmp = 1.0
+    #else:
+    j0tmp = np.sin(arg) / arg
 
     TbEH = (
         T0tildeEH(ak, 1.0, 1.0, qEH) / (1.0 + (ak * power.sEH / 5.2) ** 2)
