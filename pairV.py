@@ -1,6 +1,6 @@
 import numpy as np
 from init import cosmo_params, power_params
-from powerplot import initializePower, pNLini, poutLINEARnoh, poutNONLINEARnoh
+from powerplot import initializePower, pNLini, pout_noh
 from universal import Tgrowthfac, growthfac, phiPD
 from angdiamQp import chiRQ, HzzQ
 
@@ -250,21 +250,24 @@ def cvfacpowercompute(il, chi1, chi2, cosmo, power):
     dlkp = np.log(akplotmax / akplotmin) / (power.nplot - 1)
 
     Cvfacpower = 0.0
-
-    for int in range(1, power.nplot):
-        ak = akplotmin * np.exp(dlkp * int)
-
-        if power.ipvelLINEAR == 1:
-            puse = poutLINEARnoh(ak, 0.0, cosmo, power)
-        else:
-            puse = poutNONLINEARnoh(ak, 0.0, cosmo, power)
-
-    x = ak * chi1
+    ak = np.logspace(np.log10(akplotmin),np.log10(akplotmax),power.nplot)
+    puse = pout_noh(ak, 0.0, cosmo, power)
+    x = ak * power.rtab[i]
     sjp1 = sp.spherical_jn(il, x)
-    x = ak * chi2
     sjp2 = sp.spherical_jn(il, x)
+    Cvfac_element = ak * puse * sjp1 * sjp2
+    Cvfacpower = np.ndarray.sum(Cvfac_element)
+    #for int in range(1, power.nplot):
+    #    ak = akplotmin * np.exp(dlkp * int)
 
-    Cvfacpower += ak * puse * sjp1 * sjp2
+    #    puse = pout_noh(ak, z, cosmo, power) 
+
+    #    x = ak * chi1
+    #    sjp1 = sp.spherical_jn(il, x)
+    #    x = ak * chi2
+    #    sjp2 = sp.spherical_jn(il, x)
+
+    #    Cvfacpower += ak * puse * sjp1 * sjp2
 
     Cvfacpower = Cvfacpower / (2.0 / np.pi / np.pi) * dlkp
 
@@ -293,10 +296,7 @@ def Cvintegrate0(cosmo, power):
 
 def derive0(x, cosmo, power):
 
-    if power.ipvelLINEAR == 1:
-        puse = poutLINEARnoh(x, 0.0, cosmo, power)
-    else:
-        puse = poutNONLINEARnoh(x, 0.0, cosmo, power)
+    puse = pout_noh(x,0,cosmo,power)
 
     dydx = puse
 
@@ -393,20 +393,26 @@ def initpairVV(cosmo, power):
             sumPi = 0.0
             sumSig = 0.0
 
-            for int in range(1, power.nplot):
-                ak = akplotmin * np.exp(dlkp * int)
+            ak = np.logspace(np.log10(akplotmin),np.log10(akplotmax),power.nplot)
+            puse = pout_noh(ak, 0.0, cosmo, power)
+            x = ak * power.rtab[i]
+            sj0 = sp.spherical_jn(0, x)
+            sj1 = sp.spherical_jn(1, x)
+            Pi_elements = ak * puse * (sj0 - 2.0 * sj1 / x)
+            Sig_elements = ak * puse * sj1 / x
+            sumPi = np.ndarray.sum(Pi_elements)
+            sumSig = np.ndarray.sum(Sig_elements)
+            #for int in range(1, power.nplot):
+            #    ak = akplotmin * np.exp(dlkp * int)
 
-                if power.ipvelLINEAR == 1:
-                    puse = poutLINEARnoh(ak, 0.0, cosmo, power)
-                else:
-                    puse = poutNONLINEARnoh(ak, 0.0, cosmo, power)
+            #    puse = pout_noh(ak,0,cosmo,power)
 
-                x = ak * power.rtab[i]
-                sj0 = sp.spherical_jn(0, x)
-                sj1 = sp.spherical_jn(1, x)
+            #    x = ak * power.rtab[i]
+            #    sj0 = sp.spherical_jn(0, x)
+            #    sj1 = sp.spherical_jn(1, x)
 
-                sumPi += ak * puse * (sj0 - 2.0 * sj1 / x)
-                sumSig += ak * puse * sj1 / x
+            #    sumPi += ak * puse * (sj0 - 2.0 * sj1 / x)
+            #    sumSig += ak * puse * sj1 / x
 
             power.Pifunctab[i] = sumPi / (2.0 * np.pi * np.pi) * dlkp
             power.Sigfunctab[i] = sumSig / (2.0 * np.pi * np.pi) * dlkp
