@@ -336,37 +336,38 @@ def pNL(ak, z, cosmo, power):
     akoriginal = ak
     ak = np.log(ak)
 
-    pr = np.zeros(power.nplot)
-    akr = np.zeros(power.nplot)
+    pr = power.prpass  # np.zeros(power.nplot)
+    akr = power.akrpass  # np.zeros(power.nplot)
 
-    for i in range(power.nplot):
-        akr[i] = power.akrpass[i]
-        pr[i] = power.prpass[i]
+    # for i in range(power.nplot):
+    #     akr[i] = power.akrpass[i]
+    #     pr[i] = power.prpass[i]
 
-    iok = 0
-    pNL = 0.0
+    # iok = 0
+    # pNL = 0.0
 
-    for i in range(power.nplot - 1):
-        if ak >= akr[i] and ak <= akr[i + 1]:
-            if (akr[i + 1] - akr[i]) > dktol:
-                wL = (ak - akr[i]) / (akr[i + 1] - akr[i])
-                wR = (akr[i + 1] - ak) / (akr[i + 1] - akr[i])
-            else:
-                wL = 0.0
-                wR = 1.0
-            pNL = pr[i] * wR + pr[i + 1] * wL
-            iok = 1
-            break
+    pNL = np.interp(ak, akr, pr)
+    # for i in range(power.nplot - 1):
+    #     if ak >= akr[i] and ak <= akr[i + 1]:
+    #         if (akr[i + 1] - akr[i]) > dktol:
+    #             wL = (ak - akr[i]) / (akr[i + 1] - akr[i])
+    #             wR = (akr[i + 1] - ak) / (akr[i + 1] - akr[i])
+    #         else:
+    #             wL = 0.0
+    #             wR = 1.0
+    #         pNL = pr[i] * wR + pr[i + 1] * wL
+    #         iok = 1
+    #         break
 
-    if iok == 0:
-        print("ak outside range of power table")
-        print("ak asked for", ak)
-        print("largest table ak", akr[power.nplot - 1])
-        print("smallest table ak", akr[0])
-        if ak < akr[0]:
-            pNL = pr[0]
-        elif ak > akr[power.nplot - 1]:
-            pNL = pr[power.nplot - 1]
+    # if iok == 0:
+    #     print("ak outside range of power table")
+    #     print("ak asked for", ak)
+    #     print("largest table ak", akr[power.nplot - 1])
+    #     print("smallest table ak", akr[0])
+    #     if ak < akr[0]:
+    #         pNL = pr[0]
+    #     elif ak > akr[power.nplot - 1]:
+    #         pNL = pr[power.nplot - 1]
 
     pNL = np.exp(pNL)
     ak = akoriginal
@@ -730,28 +731,42 @@ def initializePower(cosmo, power):
     return
 
 
-def main():
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
 
-    cosmo_fid = cosmo_params("LCDM")
-    power_fid = power_params("Original")
+    default_cols = plt.rcParams["axes.prop_cycle"].by_key()["color"]
+
     # Initialize the power
 
-    initializePower(cosmo_fid, power_fid)
+    for i in [3, 4]:
+        cosmo_fid = cosmo_params("LCDM")
+        power_fid = power_params("Original", iBBKS=i)
 
-    # Will do the nonlinear power spectrum later
-    z = float(input("Input redshift: "))
-    akinput = float(input("Input k in h divided by Mpc: "))
+        initializePower(cosmo_fid, power_fid)
 
-    ak = akinput * cosmo_fid.hI
+        # Will do the nonlinear power spectrum later
+        # z = float(input("Input redshift: "))
+        z = 0.0
+        # akinput = float(input("Input k in h divided by Mpc: "))
+        akinput = np.logspace(-5, 2, 1000)
+        ak = akinput * cosmo_fid.hI
 
-    pNLini(z, cosmo_fid, power_fid)
+        # pini(cosmo_fid, power_fid)
+        # pNLini(z, cosmo_fid, power_fid)
 
-    poutLINEAR = p(ak, z, cosmo_fid, power_fid) * cosmo_fid.hI**3 * twopi3
-    poutNONLINEAR = pNL(ak, z, cosmo_fid, power_fid) * cosmo_fid.hI**3 * twopi3
-
-    print("Output linear power:", poutLINEAR)
-    print("Output nonlinear power:", poutNONLINEAR)
-
-
-if __name__ == "__main__":
-    main()
+        poutLINEAR = p(ak, z, cosmo_fid, power_fid) * cosmo_fid.hI**3 * twopi3
+        poutNONLINEAR = pNL(ak, z, cosmo_fid, power_fid) * cosmo_fid.hI**3 * twopi3
+        plt.plot(
+            ak,
+            poutLINEAR,
+            label=f"linear iBBKS={power_fid.iBBKS}",
+            color=default_cols[i - 3],
+        )
+        plt.axvline(ak[np.argmax(poutLINEAR)], ls="--", color=default_cols[i - 3])
+        # plt.plot(ak, poutNONLINEAR, "--", label=f"nonlinear iBBKS={power_fid.iBBKS}")
+    plt.legend(frameon=False)
+    plt.xscale("log")
+    plt.yscale("log")
+    plt.show()
+    # print("Output linear power:", poutLINEAR)
+    # print("Output nonlinear power:", poutNONLINEAR)

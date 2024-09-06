@@ -28,7 +28,7 @@ class cosmo_params(object):
 class power_params(object):
     """a class for holding parameters relating to the computation of the power spectra and correlation functions"""
 
-    def __init__(self, label):
+    def __init__(self, label, iBBKS):
         self.label = label
         self.zmaxact = 5.0  # This controls the maximum redshift of SNe of interest.
         # This affects the table of growth factor that we compute once for all.
@@ -42,7 +42,7 @@ class power_params(object):
         # We recommend iBBKS=4, the Hu & Eisenstein transfer function.
         # (iBBKS=1 is BBKS, iBBKS=2 is Ma [which works only for omegam=1, omegab=0.05],
         #  iBBKS=3 is EBW)
-        self.iBBKS = 4
+        self.iBBKS = iBBKS
         # The following (iGammaI to ToS) are control parameters for the power spectrum
         # that are basically obsolete (they are only used for iBBKS .ne. 4).
         # # Set iGammaI = 1 if want to set gammaeff by hand (instead of = omegam*h)
