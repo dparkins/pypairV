@@ -65,7 +65,7 @@ class power_params(object):
         self.veldisp = 0.0
         # self.veldisp=300.0
 
-        self.pnorm = 1.0  # normaliation of power spectrum
+        self.pnorm = 1.0  # normalisation of power spectrum
         # Control parameters for nonlinear power spectrum*
         # Choose ipvelLINEAR=1 if wants to use linear theory (recommended),
         # otherwise choose ipvelLINEAR=0 to use a nonlinear power spectrum.
@@ -82,6 +82,7 @@ class power_params(object):
         self.iJMW = 0  # Set iJMW=1 if want to use JMW power spectrum, otherwise to 0
         self.iPD = 0  # Set iPD=1 if want to use PD power spectrum, otherwise to 0
         self.iSmith = 1  # Set iSmith=1 if want to use Smith et al. power spectrum, otherwise to 0.
+        self.ipext = 1  # Set to 1 if you want to use your own power spectrum
         self.ipNLinibigtable = 0
         # This controls the number of k bins I used to compute the integrals over P(k).
         self.nplot = 2000

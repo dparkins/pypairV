@@ -2,6 +2,7 @@ import numpy as np
 import scipy.integrate as sp
 from astropy.cosmology import LambdaCDM
 import astropy.units as u
+from init import cosmo_params
 
 # This is based on angdiamQ.f, which assumed wQ=constant.
 # Here, I want to allow for a time-varying wQ.
@@ -38,8 +39,6 @@ import astropy.units as u
 #                       ~ (1+z)^3(1+wQ+wQp) * exp(-3*wQp*z/(1+z))
 #
 # ------------------------------------------------------------------------------------------------
-import numpy as np
-from init import cosmo_params
 
 
 def HzzQ(z, cosmo):

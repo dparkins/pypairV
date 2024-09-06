@@ -8,50 +8,58 @@ from growthq import fgQQ, growthini
 twopi3 = (2 * np.pi) ** 3
 
 
-def poutLINEAR(akinput, z, hI, twopi3):
-    # this gives the linear power spectrum in unit of (Mpc/h)^3
-    # where Δ = k^3 poutLINEAR / (2pi)^3
+def pout_h(akinput, z, cosmo, power):
+    # this gives the linear/nonlinear power spectrum in unit of (Mpc/h)^3
+    # where Δ = k^3 pout / (2pi)^3
     # and where akinput is in (h/Mpc)
-
-    ak = akinput * hI
-    poutLINEAR = p(ak, z) * hI**3 * twopi3
-
-    return poutLINEAR
-
-
-def poutNONLINEAR(akinput, z, hI, twopi3):
-    # this gives the nonlinear power spectrum in unit of (Mpc/h)^3
-    # where Δ = k^3 poutNONLINEAR / (2pi)^3
-    # and where akinput is in h/Mpc
-
-    ak = akinput * hI
-    poutNONLINEAR = pNL(ak, z) * hI**3 * twopi3
-
-    return poutNONLINEAR
-
-
-def poutLINEARnoh(ak, z, cosmo, power):
-    # This gives the linear power spectrum in unit of (Mpc)^3 <-- no h's !
-    # where Δ = k^3 poutLINEARnoh / (2pi)^3
-    # and where ak is in 1/Mpc <-- no h !
-
-    poutLINEARnoh = p(ak, z, cosmo, power) * twopi3
-
-    return poutLINEARnoh
-
-
-def poutNONLINEARnoh(ak, z):
-    # This gives the nonlinear power spectrum in unit of (Mpc)^3 <-- no h's !
-    # where Δ = k^3 poutNONLINEARnoh / (2pi)^3
-    # and where ak is in 1/Mpc <-- no h !
-    global pNL, pNLbig, ipNLinibigtable, twopi3  # Assuming these are defined elsewhere
-
-    if ipNLinibigtable == 0:
-        poutNONLINEARnoh = pNL(ak, z) * twopi3
+    ak = akinput * cosmo.hI
+    if power.ipvelLINEAR:
+        pout = p(ak, z, cosmo, power) * cosmo.hI**3 * twopi3
     else:
-        poutNONLINEARnoh = pNLbig(ak, z) * twopi3
+        pout = pNL(ak, z, cosmo, power) * cosmo.hI**3 * twopi3
 
-    return poutNONLINEARnoh
+    return pout
+
+
+# def poutNONLINEAR(akinput, z):
+#     # this gives the nonlinear power spectrum in unit of (Mpc/h)^3
+#     # where Δ = k^3 poutNONLINEAR / (2pi)^3
+#     # and where akinput is in h/Mpc
+
+#     ak = akinput * hI
+#     poutNONLINEAR = pNL(ak, z) * cosmo.hI**3 * twopi3
+
+#     return poutNONLINEAR
+
+
+def pout_noh(ak, z, cosmo, power):
+    # This gives the linear/nonlinear power spectrum in unit of (Mpc)^3 <-- no h's !
+    # where Δ = k^3 pout / (2pi)^3
+    # and where ak is in 1/Mpc <-- no h !
+
+    if power.ipvelLINEAR:
+        pout = p(ak, z, cosmo, power) * twopi3
+    else:
+        if power.ipNLinibigtable == 0:
+            pout = pNL(ak, z, cosmo, power) * twopi3
+        else:
+            pout = pNLbig(ak, z, cosmo, power) * twopi3
+
+    return pout
+
+
+# def poutNONLINEARnoh(ak, z):
+#     # This gives the nonlinear power spectrum in unit of (Mpc)^3 <-- no h's !
+#     # where Δ = k^3 poutNONLINEARnoh / (2pi)^3
+#     # and where ak is in 1/Mpc <-- no h !
+#     global pNL, pNLbig, ipNLinibigtable, twopi3  # Assuming these are defined elsewhere
+
+#     if ipNLinibigtable == 0:
+#         poutNONLINEARnoh = pNL(ak, z) * twopi3
+#     else:
+#         poutNONLINEARnoh = pNLbig(ak, z) * twopi3
+
+#     return poutNONLINEARnoh
 
 
 def pini(cosmo, power):
@@ -261,8 +269,9 @@ def p(ak, z, cosmo, power):
     # i.e. 4pi k^3 P_ED is the right Delta
     # where 4pi k^3 / (twopi^3) P_usual is the right Delta
 
-    if ak <= 0.0:
-        return 0.0
+    # if ak <= 0.0:
+    #     return 0.0
+    ak = np.where(ak <= 0, 0.0, ak)
 
     if power.iGammaI == 1:
         omegahh = power.gammaeff * cosmo.hI
@@ -612,10 +621,11 @@ def transferEH(ak, power):
 
     arg = ak * stildeEH
 
-    if arg < argtol:
-        j0tmp = 1.0
-    else:
-        j0tmp = np.sin(arg) / arg
+    # if arg < argtol:
+    #     j0tmp = 1.0
+    # else:
+    #     j0tmp = np.sin(arg) / arg
+    j0tmp = np.where(arg < argtol, 1.0, np.sin(arg) / arg)
 
     TbEH = (
         T0tildeEH(ak, 1.0, 1.0, qEH) / (1.0 + (ak * power.sEH / 5.2) ** 2)

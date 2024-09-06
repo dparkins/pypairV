@@ -3,7 +3,7 @@ import pandas as pd
 import sys
 import time
 from init import cosmo_params, power_params
-from powerplot import initializePower, pNLini, poutLINEARnoh, poutNONLINEARnoh
+from powerplot import initializePower, pNLini, pout_noh
 from universal import Tgrowthfac, growthfac, phiPD
 from angdiamQp import chiRQ, HzzQ
 
@@ -103,14 +103,14 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2, init, cosmo, power, imethod):
         dtheta = angsep(RA1, DEC1, RA2, DEC2)
 
         if init:
-            out = initializePower(cosmo, power)
+            _ = initializePower(cosmo, power)
 
         fac1, Dprimeoverc1, chi1 = cosmocompute(z1, cosmo, power)
         fac2, Dprimeoverc2, chi2 = cosmocompute(z2, cosmo, power)
 
         if power.ipvelLINEAR != 1:
             if init:
-                out = pNLini(0.0)
+                _ = pNLini(0.0)
 
         if init:
             initpairVV(cosmo, power)
@@ -120,6 +120,7 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2, init, cosmo, power, imethod):
         Cv = np.zeros(len(z2))
         xiV = np.zeros(len(z2))
         Cv = np.where(
+            # If the SNe are the same (tiny dtheta and dz) and you want to add a dispersion (disp > 0):
             (dtheta < dthetatol)
             & (np.abs(z1 - z2) < dztol)
             & (power.veldisp > veldisptol),
@@ -134,7 +135,6 @@ def pairVV(RA1, DEC1, z1, RA2, DEC2, z2, init, cosmo, power, imethod):
             0.0,
         )
 
-        # If the SNe are the same (tiny dtheta and dz) and you want to add a dispersion (disp > 0):
         # if dtheta < dthetatol and np.abs(z1 - z2) < dztol:
         #     if power.veldisp > veldisptol:
         #         Cv = (
@@ -195,7 +195,7 @@ def angsep(ra1, dec1, ra2, dec2):
     ) * np.cos(theta2)
 
     if np.any(cosSep > 1.0):
-        print("warning cosSep greater than 1", cosSep[np.where(cosSep > 1.0)])
+        print("warning cosSep greater than 1 by:", cosSep[cosSep > 1.0].values - 1.0)
         cosSep = np.where(cosSep > 1.0, 1.0, cosSep)
 
     dtheta = np.arccos(cosSep)
@@ -280,13 +280,13 @@ def cvfacpowercompute(il, chi1, chi2, cosmo, power):
 
     Cvfacpower = 0.0
 
-    for int in range(1, power.nplot):
-        ak = akplotmin * np.exp(dlkp * int)
+    for ii in range(1, power.nplot):
+        ak = akplotmin * np.exp(dlkp * ii)
 
-        if power.ipvelLINEAR == 1:
-            puse = poutLINEARnoh(ak, 0.0, cosmo, power)
-        else:
-            puse = poutNONLINEARnoh(ak, 0.0, cosmo, power)
+        # if power.ipvelLINEAR == 1:
+        puse = pout_noh(ak, 0.0, cosmo, power)
+        # else:
+        #     puse = poutNONLINEARnoh(ak, 0.0, cosmo, power)
 
     x = ak * chi1
     sjp1 = sp.spherical_jn(il, x)
@@ -322,10 +322,10 @@ def Cvintegrate0(cosmo, power):
 
 def derive0(x, cosmo, power):
 
-    if power.ipvelLINEAR == 1:
-        puse = poutLINEARnoh(x, 0.0, cosmo, power)
-    else:
-        puse = poutNONLINEARnoh(x, 0.0, cosmo, power)
+    # if power.ipvelLINEAR == 1:
+    puse = pout_noh(x, 0.0, cosmo, power)
+    # else:
+    #     puse = poutNONLINEARnoh(x, 0.0, cosmo, power)
 
     dydx = puse
 
@@ -468,20 +468,20 @@ def initpairVV(cosmo, power):
             sumPi = 0.0
             sumSig = 0.0
 
-            for ii in range(1, power.nplot):
-                ak = akplotmin * np.exp(dlkp * ii)
+            # for ii in range(1, power.nplot):
+            ak = akplotmin * np.exp(dlkp * np.arange(1, power.nplot))
 
-                if power.ipvelLINEAR == 1:
-                    puse = poutLINEARnoh(ak, 0.0, cosmo, power)
-                else:
-                    puse = poutNONLINEARnoh(ak, 0.0, cosmo, power)
+            # if power.ipvelLINEAR == 1:
+            puse = pout_noh(ak, 0.0, cosmo, power)
+            # else:
+            #     puse = poutNONLINEARnoh(ak, 0.0, cosmo, power)
 
-                x = ak * power.rtab[i]
-                sj0 = sp.spherical_jn(0, x)
-                sj1 = sp.spherical_jn(1, x)
+            x = ak * power.rtab[i]
+            sj0 = sp.spherical_jn(0, x)
+            sj1 = sp.spherical_jn(1, x)
 
-                sumPi += ak * puse * (sj0 - 2.0 * sj1 / x)
-                sumSig += ak * puse * sj1 / x
+            sumPi = np.ndarray.sum(ak * puse * (sj0 - 2.0 * sj1 / x))
+            sumSig = np.ndarray.sum(ak * puse * sj1 / x)
 
             power.Pifunctab[i] = sumPi / (2.0 * np.pi * np.pi) * dlkp
             power.Sigfunctab[i] = sumSig / (2.0 * np.pi * np.pi) * dlkp
@@ -742,7 +742,7 @@ if __name__ == "__main__":
             dzout = (zinputmax - zinput) / float(itotal - 1)
 
         with open("Cv.output", "w") as f3:
-            f3.write("COV DIST CID1 RA1 DEC1 z1 CID2 RA2 DEC2 z2 ID1 ID2 CORR\n")
+            f3.write("COV DIST z2 CORR\n")
             ipair = 0
             for i in range(itotal):
                 if ifix == 1:
